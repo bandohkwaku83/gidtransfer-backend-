@@ -1,0 +1,3129 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Photo Global API",
+    "description": "Photographer API (user JWT auth).\n\n## Setup\n1. Import **Photo Global — Local** (`postman/Photo_Global.local.postman_environment.json`).\n2. **Select that environment** in Postman (top-right). Required for `{{token}}` to work.\n3. Start API: `npm start` → `http://127.0.0.1:7100`\n4. AI gallery text: add `OPENAI_API_KEY` to `.env`, restart.\n5. Client share links use `APP_URL` in `.env` (default `http://localhost:3000/{companySlug}/{gallerySlug}`).\n\n## Token (important)\n- Run **Auth → Register** or **Login** (or **Google sign in**).\n- Tests save the JWT to **both** the environment and collection variable `token`.\n- Protected routes send `Authorization: Bearer {{token}}` (collection auth).\n- If **Me** returns 401: re-run Login on the **same** `baseUrl` (local vs production use different `JWT_SECRET`).\n- Use **Auth → Clear token** before switching users.\n\n## Flow\nRegister/Login → **Onboarding** (sets `companySlug`) → Create client → **Galleries → Create gallery** (saves `{{galleryId}}`) → **Get gallery detail** → **Customize gallery** (design, client access, selection limit) → **Activate share link** → **Public Galleries** (no JWT; use **Unlock gallery** when password-protected).\n\n**Public gallery access:** after **Unlock gallery**, `{{galleryAccessToken}}` is saved automatically and sent as `X-Gallery-Access-Token` on public routes (collection pre-request script).\n\nUpload raw files: **Galleries → Uploads → Upload files** (`photos` field). Finals: **Galleries → Finals → Upload finals** (`finals` field). Both accept images and video.\n\n## Upload limits (per file)\n- **Images:** max **100MB** each\n- **Videos:** max **1TB** each\n- **Batch:** up to **700 files** per request",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "/**",
+          " * Postman resolves {{token}} from the active ENVIRONMENT before collection variables.",
+          " * Always save tokens to both scopes (see saveAuthToken).",
+          " */",
+          "saveAuthToken = function (token) {",
+          "    if (!token || typeof token !== 'string') return;",
+          "    const trimmed = token.trim();",
+          "    if (!trimmed || trimmed === 'undefined' || trimmed === 'null') return;",
+          "    pm.collectionVariables.set('token', trimmed);",
+          "    if (pm.environment) {",
+          "        pm.environment.set('token', trimmed);",
+          "    }",
+          "};",
+          "",
+          "getAuthToken = function () {",
+          "    if (pm.environment) {",
+          "        const env = pm.environment.get('token');",
+          "        if (env && String(env).trim()) return String(env).trim();",
+          "    }",
+          "    const col = pm.collectionVariables.get('token');",
+          "    return col ? String(col).trim() : '';",
+          "};",
+          "",
+          "saveClientId = function (id) {",
+          "    if (!id) return;",
+          "    const value = String(id);",
+          "    pm.collectionVariables.set('clientId', value);",
+          "    if (pm.environment) {",
+          "        pm.environment.set('clientId', value);",
+          "    }",
+          "};",
+          "",
+          "saveGalleryId = function (id) {",
+          "    if (!id) return;",
+          "    const value = String(id);",
+          "    pm.collectionVariables.set('galleryId', value);",
+          "    if (pm.environment) pm.environment.set('galleryId', value);",
+          "};",
+          "",
+          "savePhotoId = function (id) {",
+          "    if (!id) return;",
+          "    const value = String(id);",
+          "    pm.collectionVariables.set('photoId', value);",
+          "    if (pm.environment) pm.environment.set('photoId', value);",
+          "};",
+          "",
+          "saveFinalId = function (id) {",
+          "    if (!id) return;",
+          "    const value = String(id);",
+          "    pm.collectionVariables.set('finalId', value);",
+          "    if (pm.environment) pm.environment.set('finalId', value);",
+          "};",
+          "",
+          "saveGallerySlugs = function (gallery) {",
+          "    if (!gallery) return;",
+          "    if (gallery.companySlug) {",
+          "        pm.collectionVariables.set('companySlug', gallery.companySlug);",
+          "        if (pm.environment) pm.environment.set('companySlug', gallery.companySlug);",
+          "    }",
+          "    const slug = gallery.slug || gallery.gallerySlug;",
+          "    if (slug) {",
+          "        pm.collectionVariables.set('gallerySlug', slug);",
+          "        if (pm.environment) pm.environment.set('gallerySlug', slug);",
+          "    }",
+          "};",
+          "",
+          "saveShareToken = function (token) {",
+          "    if (!token) return;",
+          "    const value = String(token);",
+          "    pm.collectionVariables.set('shareToken', value);",
+          "    if (pm.environment) pm.environment.set('shareToken', value);",
+          "};",
+          "",
+          "saveGalleryAccessToken = function (token) {",
+          "    if (!token) return;",
+          "    const value = String(token);",
+          "    pm.collectionVariables.set('galleryAccessToken', value);",
+          "    if (pm.environment) pm.environment.set('galleryAccessToken', value);",
+          "};",
+          "",
+          "getGalleryAccessToken = function () {",
+          "    if (pm.environment) {",
+          "        const env = pm.environment.get('galleryAccessToken');",
+          "        if (env && String(env).trim()) return String(env).trim();",
+          "    }",
+          "    const col = pm.collectionVariables.get('galleryAccessToken');",
+          "    return col ? String(col).trim() : '';",
+          "};",
+          "",
+          "const publicPaths = [",
+          "    '/api/auth/register',",
+          "    '/api/auth/login',",
+          "    '/api/auth/google',",
+          "    '/api/auth/forgot-password',",
+          "    '/api/auth/reset-password',",
+          "    '/health',",
+          "    '/api',",
+          "];",
+          "const path = pm.request.url.getPath();",
+          "const isPublic =",
+          "    path === '/' ||",
+          "    path.startsWith('/api/public/') ||",
+          "    publicPaths.some((p) => path === p || path.endsWith(p));",
+          "if (!isPublic && !getAuthToken()) {",
+          "    console.warn(",
+          "        'No token — run Auth → Register or Login (with Photo Global — Local environment selected).'",
+          "    );",
+          "}",
+          "",
+          "if (path.startsWith('/api/public/') && !path.endsWith('/unlock')) {",
+          "    const galleryAccessToken = getGalleryAccessToken();",
+          "    if (galleryAccessToken) {",
+          "        pm.request.headers.upsert({",
+          "            key: 'X-Gallery-Access-Token',",
+          "            value: galleryAccessToken,",
+          "        });",
+          "    }",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:7100"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "email",
+      "value": "you@studio.com"
+    },
+    {
+      "key": "password",
+      "value": "secret12"
+    },
+    {
+      "key": "clientId",
+      "value": ""
+    },
+    {
+      "key": "bookingId",
+      "value": ""
+    },
+    {
+      "key": "incomeId",
+      "value": ""
+    },
+    {
+      "key": "galleryId",
+      "value": ""
+    },
+    {
+      "key": "photoId",
+      "value": ""
+    },
+    {
+      "key": "finalId",
+      "value": ""
+    },
+    {
+      "key": "companySlug",
+      "value": ""
+    },
+    {
+      "key": "gallerySlug",
+      "value": ""
+    },
+    {
+      "key": "shareToken",
+      "value": ""
+    },
+    {
+      "key": "galleryAccessToken",
+      "value": ""
+    },
+    {
+      "key": "galleryPassword",
+      "value": "gallery-secret"
+    }
+  ],
+  "item": [
+    {
+      "name": "General",
+      "item": [
+        {
+          "name": "Root",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/"
+          },
+          "response": []
+        },
+        {
+          "name": "Health",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health"
+          },
+          "response": []
+        },
+        {
+          "name": "API index",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Public: Register, Login, Google, Forgot/Reset password. Each login-style response saves `token` to environment + collection. After **Register**, verify email via **Verify email** (OTP is logged as `[email-verification]` in dev). Protected: **Me**, **Verify email**, **Resend verification**.",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Created (201)', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.test('Response has token', () => {",
+                  "        pm.expect(json.token).to.be.a('string').and.not.empty;",
+                  "    });",
+                  "    saveAuthToken(json.token);",
+                  "    pm.test('Token stored in environment', () => {",
+                  "        pm.expect(getAuthToken()).to.eql(json.token);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"acceptedTerms\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.test('Response has token', () => {",
+                  "        pm.expect(json.token).to.be.a('string').and.not.empty;",
+                  "    });",
+                  "    saveAuthToken(json.token);",
+                  "    pm.test('Token stored in environment', () => {",
+                  "        pm.expect(getAuthToken()).to.eql(json.token);",
+                  "    });",
+                  "}",
+                  "if (pm.response.code === 401) {",
+                  "    console.warn(pm.response.json().message || 'Login failed');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "description": "Email/password accounts only. Google users must use **Google sign in**.",
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "Google sign in",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200 or 201)', () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    saveAuthToken(json.token);",
+                  "    pm.test('Token stored', () => {",
+                  "        pm.expect(getAuthToken()).to.eql(json.token);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idToken\": \"<paste-google-id-token>\"\n}"
+            },
+            "description": "Requires `GOOGLE_CLIENT_ID` in API `.env` matching your OAuth client.",
+            "url": "{{baseUrl}}/api/auth/google"
+          },
+          "response": []
+        },
+        {
+          "name": "Forgot password",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\"\n}"
+            },
+            "description": "Always 200. Dev: check API terminal for `[password-reset]` URL.",
+            "url": "{{baseUrl}}/api/auth/forgot-password"
+          },
+          "response": []
+        },
+        {
+          "name": "Reset password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200 && pm.response.json().token) {",
+                  "    saveAuthToken(pm.response.json().token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"<paste-reset-token-from-terminal>\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "description": "`token` here is the **password-reset** token from the email/link, not the JWT.",
+            "url": "{{baseUrl}}/api/auth/reset-password"
+          },
+          "response": []
+        },
+        {
+          "name": "Sign out",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    pm.collectionVariables.set('token', '');",
+                  "    if (pm.environment) {",
+                  "        pm.environment.set('token', '');",
+                  "    }",
+                  "    pm.test('Token cleared after sign out', () => {",
+                  "        pm.expect(getAuthToken()).to.eql('');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": "Invalidates the current JWT on the server and clears `token` in Postman. Client should also remove stored credentials. (`POST /api/auth/logout` is an alias.)",
+            "url": "{{baseUrl}}/api/auth/signout"
+          },
+          "response": []
+        },
+        {
+          "name": "Me (verify token)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const t = getAuthToken();",
+                  "if (!t) {",
+                  "    throw new Error('No token set. Run Register or Login first (with environment selected).');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Returns user', () => {",
+                  "        pm.expect(pm.response.json().user).to.have.property('email');",
+                  "    });",
+                  "}",
+                  "if (pm.response.code === 401) {",
+                  "    const msg = pm.response.json().message || '';",
+                  "    console.warn(msg);",
+                  "    pm.test('401 hint', () => {",
+                  "        pm.expect(msg).to.match(/token|expired|log in/i);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Sends `Authorization: Bearer {{token}}`. Fails fast in pre-request if token is empty.",
+            "url": "{{baseUrl}}/api/auth/me"
+          },
+          "response": []
+        },
+        {
+          "name": "Verify email",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.token) saveAuthToken(json.token);",
+                  "    pm.test('Email verified', () => {",
+                  "        pm.expect(json.user.emailVerified).to.eql(true);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"123456\"\n}"
+            },
+            "description": "Set `code` from API terminal `[email-verification]` log after Register.",
+            "url": "{{baseUrl}}/api/auth/verify-email"
+          },
+          "response": []
+        },
+        {
+          "name": "Resend verification",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/resend-verification"
+          },
+          "response": []
+        },
+        {
+          "name": "Clear token",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('token', '');",
+                  "if (pm.environment) {",
+                  "    pm.environment.set('token', '');",
+                  "}",
+                  "console.log('Token cleared from environment and collection.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Token cleared', () => {",
+                  "    pm.expect(getAuthToken()).to.eql('');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "description": "Clears `token` before switching users or re-login. Does not call the API.",
+            "url": "{{baseUrl}}/health"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Onboarding",
+      "description": "Requires JWT (`{{token}}`). Run **Auth → Login** first. Use **Complete onboarding** once (all required fields + optional logo in one request).",
+      "item": [
+        {
+          "name": "Get studio profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 401) {",
+                  "    console.warn('Run Auth → Login then Me. Ensure Photo Global — Local environment is selected.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/onboarding"
+          },
+          "response": []
+        },
+        {
+          "name": "Complete onboarding",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    const user = pm.response.json().user;",
+                  "    pm.test('onboardingComplete', () => {",
+                  "        pm.expect(user.onboardingComplete).to.eql(true);",
+                  "    });",
+                  "    const slug = user.studio?.companySlug;",
+                  "    if (slug) {",
+                  "        pm.collectionVariables.set('companySlug', slug);",
+                  "        if (pm.environment) pm.environment.set('companySlug', slug);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "companyName",
+                  "value": "Gidtransfer",
+                  "type": "text",
+                  "description": "Required — business name"
+                },
+                {
+                  "key": "companySlug",
+                  "value": "gidtransfer",
+                  "type": "text",
+                  "description": "Required — studio URL slug (subdomain)"
+                },
+                {
+                  "key": "primaryDeliverable",
+                  "value": "photos_videos",
+                  "type": "text",
+                  "description": "Required — e.g. photos, videos, photos_videos"
+                },
+                {
+                  "key": "country",
+                  "value": "United States",
+                  "type": "text",
+                  "description": "Required"
+                },
+                {
+                  "key": "phone",
+                  "value": "+233200000000",
+                  "type": "text",
+                  "description": "Required — business phone"
+                },
+                {
+                  "key": "smsSenderId",
+                  "value": "Gidtransfer",
+                  "type": "text",
+                  "description": "Required — SMS display name (max 11 letters/numbers; pending carrier approval)"
+                },
+                {
+                  "key": "referralCode",
+                  "value": "",
+                  "type": "text",
+                  "description": "Optional",
+                  "disabled": true
+                },
+                {
+                  "key": "logo",
+                  "type": "file",
+                  "src": [],
+                  "description": "Optional PNG/JPG, max 5MB — leave empty or pick a file"
+                }
+              ]
+            },
+            "description": "Single `POST /api/onboarding` with all required fields in one multipart request. Logo is optional — include the `logo` file only when you have one. Uses Bearer `{{token}}`.",
+            "url": "{{baseUrl}}/api/onboarding"
+          },
+          "response": []
+        },
+        {
+          "name": "Update studio profile",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "companyName",
+                  "value": "Gidtransfer",
+                  "type": "text"
+                },
+                {
+                  "key": "companySlug",
+                  "value": "gidtransfer",
+                  "type": "text"
+                },
+                {
+                  "key": "primaryDeliverable",
+                  "value": "photos_videos",
+                  "type": "text"
+                },
+                {
+                  "key": "country",
+                  "value": "United States",
+                  "type": "text"
+                },
+                {
+                  "key": "phone",
+                  "value": "+233200000001",
+                  "type": "text"
+                },
+                {
+                  "key": "smsSenderId",
+                  "value": "Gidtransfer",
+                  "type": "text"
+                },
+                {
+                  "key": "referralCode",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "logo",
+                  "type": "file",
+                  "src": [],
+                  "description": "Optional — only when replacing logo"
+                }
+              ]
+            },
+            "description": "Partial update — send only fields you want to change. Same multipart shape as **Complete onboarding**.",
+            "url": "{{baseUrl}}/api/onboarding"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "SMS",
+      "description": "Studio SMS identity (Arkesel). Requires JWT. Approve sender IDs via Admin routes before branded sends use the studio name.",
+      "item": [
+        {
+          "name": "Get SMS config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/sms/config"
+          },
+          "response": []
+        },
+        {
+          "name": "Send test SMS",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+233200000000\",\n  \"message\": \"Test from Gidtransfer\"\n}"
+            },
+            "url": "{{baseUrl}}/api/sms/test"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Email",
+      "description": "Photographer email notifications (Resend). Requires JWT.",
+      "item": [
+        {
+          "name": "Get email config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/email/config"
+          },
+          "response": []
+        },
+        {
+          "name": "Send test email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": "{{baseUrl}}/api/email/test"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "description": "Platform admin JWT (`adminToken`). Run **Admin login** first, then approve studio SMS sender IDs.",
+      "item": [
+        {
+          "name": "Admin login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const token = pm.response.json().token;",
+                  "    pm.collectionVariables.set('adminToken', token);",
+                  "    if (pm.environment) pm.environment.set('adminToken', token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"your-admin-password\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "List pending sender IDs",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/sms/sender-ids?status=pending"
+          },
+          "response": []
+        },
+        {
+          "name": "Approve studio sender ID",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "PATCH",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/sms/sender-ids/{{userId}}/approve"
+          },
+          "response": []
+        },
+        {
+          "name": "Get email logo",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/email/logo"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload email logo",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "logo",
+                  "type": "file",
+                  "src": [],
+                  "description": "PNG or JPG, max 5MB — Gidtransfer logo for all notification emails"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/admin/email/logo"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Settings",
+      "description": "Profile settings screen — profile card, overview stats, studio details, logo, and account info. Requires JWT (`{{token}}`).",
+      "item": [
+        {
+          "name": "Get settings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.test('settings payload', () => {",
+                  "        pm.expect(body.settings).to.be.an('object');",
+                  "        pm.expect(body.settings.profile).to.be.an('object');",
+                  "        pm.expect(body.settings.overview).to.be.an('object');",
+                  "        pm.expect(body.settings.studio).to.be.an('object');",
+                  "        pm.expect(body.settings.account).to.be.an('object');",
+                  "    });",
+                  "    const accountId = body.settings.account?.accountId;",
+                  "    if (accountId) {",
+                  "        pm.test('accountId format', () => pm.expect(accountId).to.match(/^gt\\d+$/));",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/settings"
+          },
+          "response": []
+        },
+        {
+          "name": "Get settings profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/settings/profile"
+          },
+          "response": []
+        },
+        {
+          "name": "Get settings overview",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/settings/overview"
+          },
+          "response": []
+        },
+        {
+          "name": "Get settings studio",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/settings/studio"
+          },
+          "response": []
+        },
+        {
+          "name": "Get settings account",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/settings/account"
+          },
+          "response": []
+        },
+        {
+          "name": "Update settings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "businessName",
+                  "value": "Gidtransfer",
+                  "type": "text",
+                  "description": "Business / studio name"
+                },
+                {
+                  "key": "companySlug",
+                  "value": "gidtransfer",
+                  "type": "text",
+                  "description": "Studio URL slug"
+                },
+                {
+                  "key": "phone",
+                  "value": "+233200000000",
+                  "type": "text",
+                  "description": "Business phone (optional)"
+                },
+                {
+                  "key": "website",
+                  "value": "https://gidtransfer.com",
+                  "type": "text",
+                  "description": "Website (optional)"
+                },
+                {
+                  "key": "logo",
+                  "type": "file",
+                  "src": [],
+                  "description": "Optional studio logo PNG/JPG"
+                },
+                {
+                  "key": "avatar",
+                  "type": "file",
+                  "src": [],
+                  "description": "Optional profile photo PNG/JPG, max 1.2 MB"
+                }
+              ]
+            },
+            "description": "Save profile settings. Send only fields you want to change. Use clearLogo=true or clearAvatar=true to remove images.",
+            "url": "{{baseUrl}}/api/settings"
+          },
+          "response": []
+        },
+        {
+          "name": "Watermark",
+          "description": "Watermark logo on client downloads — toggle, logo upload, trim box, and portrait/landscape placement.",
+          "item": [
+            {
+              "name": "Get watermark settings",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                      "if (pm.response.code === 200) {",
+                      "    const body = pm.response.json();",
+                      "    pm.test('watermark payload', () => {",
+                      "        pm.expect(body.watermark).to.be.an('object');",
+                      "        pm.expect(body.watermark).to.have.property('enabled');",
+                      "        pm.expect(body.watermark.logo).to.be.an('object');",
+                      "        pm.expect(body.watermark.portrait).to.be.an('object');",
+                      "        pm.expect(body.watermark.landscape).to.be.an('object');",
+                      "    });",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/settings/watermark"
+              },
+              "response": []
+            },
+            {
+              "name": "Update watermark settings",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('OK (200)', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "enabled",
+                      "value": "true",
+                      "type": "text",
+                      "description": "Put logo on downloaded photos"
+                    },
+                    {
+                      "key": "trimX",
+                      "value": "0",
+                      "type": "text",
+                      "description": "Trim box left (0–1, optional)"
+                    },
+                    {
+                      "key": "trimY",
+                      "value": "0",
+                      "type": "text"
+                    },
+                    {
+                      "key": "trimWidth",
+                      "value": "1",
+                      "type": "text"
+                    },
+                    {
+                      "key": "trimHeight",
+                      "value": "1",
+                      "type": "text"
+                    },
+                    {
+                      "key": "portraitSize",
+                      "value": "medium",
+                      "type": "text",
+                      "description": "small | medium | large (or 0–100 slider)"
+                    },
+                    {
+                      "key": "portraitOpacity",
+                      "value": "65",
+                      "type": "text",
+                      "description": "0–100"
+                    },
+                    {
+                      "key": "portraitPositionX",
+                      "value": "85",
+                      "type": "text",
+                      "description": "Percent from left"
+                    },
+                    {
+                      "key": "portraitPositionY",
+                      "value": "90",
+                      "type": "text",
+                      "description": "Percent from top"
+                    },
+                    {
+                      "key": "landscapeSize",
+                      "value": "medium",
+                      "type": "text"
+                    },
+                    {
+                      "key": "landscapeOpacity",
+                      "value": "65",
+                      "type": "text"
+                    },
+                    {
+                      "key": "landscapePositionX",
+                      "value": "85",
+                      "type": "text"
+                    },
+                    {
+                      "key": "landscapePositionY",
+                      "value": "90",
+                      "type": "text"
+                    },
+                    {
+                      "key": "logo",
+                      "type": "file",
+                      "src": [],
+                      "description": "Optional watermark logo PNG/JPG (transparent PNG recommended)"
+                    }
+                  ]
+                },
+                "description": "Save watermark settings. Send only fields you want to change. Use clearLogo=true to remove the watermark logo.",
+                "url": "{{baseUrl}}/api/settings/watermark"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Gallery defaults",
+          "description": "Default gallery cover and watermark preview thumbnails for new galleries.",
+          "item": [
+            {
+              "name": "Get gallery defaults",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                      "if (pm.response.code === 200) {",
+                      "    const body = pm.response.json();",
+                      "    pm.test('galleryDefaults payload', () => {",
+                      "        pm.expect(body.galleryDefaults).to.be.an('object');",
+                      "        pm.expect(body.galleryDefaults).to.have.property('watermarkPreviewEnabled');",
+                      "        pm.expect(body.galleryDefaults.defaultCover).to.be.an('object');",
+                      "    });",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/settings/gallery-defaults"
+              },
+              "response": []
+            },
+            {
+              "name": "Toggle watermark preview",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('OK (200)', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"watermarkPreviewEnabled\": true\n}"
+                },
+                "description": "Toggle only — use when the switch changes in the UI.",
+                "url": "{{baseUrl}}/api/settings/gallery-defaults/watermark-preview"
+              },
+              "response": []
+            },
+            {
+              "name": "Upload default cover",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('OK (200)', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "defaultCover",
+                      "type": "file",
+                      "src": [],
+                      "description": "Wide JPG/PNG/WebP (1600×900+ recommended). Field name cover or defaultCover."
+                    }
+                  ]
+                },
+                "description": "Upload cover only — does not change the watermark preview toggle.",
+                "url": "{{baseUrl}}/api/settings/gallery-defaults/default-cover"
+              },
+              "response": []
+            },
+            {
+              "name": "Remove default cover",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": "{{baseUrl}}/api/settings/gallery-defaults/default-cover"
+              },
+              "response": []
+            },
+            {
+              "name": "Update gallery defaults (combined)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('OK (200)', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "watermarkPreviewEnabled",
+                      "value": "false",
+                      "type": "text",
+                      "description": "Text watermark on client selection thumbnails"
+                    },
+                    {
+                      "key": "defaultCover",
+                      "type": "file",
+                      "src": [],
+                      "description": "Optional default cover — wide JPG/PNG/WebP (1600×900+ recommended)"
+                    }
+                  ]
+                },
+                "description": "Save toggle and cover together. Use clearCover=true to remove the default cover.",
+                "url": "{{baseUrl}}/api/settings/gallery-defaults"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Help & support",
+          "description": "Report an issue — submit topic, description, and optional screenshots/files directly to the API.",
+          "item": [
+            {
+              "name": "Get help & support form",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                      "if (pm.response.code === 200) {",
+                      "    const body = pm.response.json();",
+                      "    pm.test('help support payload', () => {",
+                      "        pm.expect(body.helpSupport.topics).to.be.an('array').that.is.not.empty;",
+                      "        pm.expect(body.helpSupport.attachments.enabled).to.eql(true);",
+                      "    });",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/settings/help-support"
+              },
+              "response": []
+            },
+            {
+              "name": "Submit issue report",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Created (201)', () => pm.response.to.have.status(201));",
+                      "if (pm.response.code === 201) {",
+                      "    const body = pm.response.json();",
+                      "    pm.test('report submitted', () => {",
+                      "        pm.expect(body.message).to.eql('Report submitted');",
+                      "        pm.expect(body.report).to.be.an('object');",
+                      "        pm.expect(body.mailto).to.be.undefined;",
+                      "    });",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "topic",
+                      "value": "not_working",
+                      "type": "text",
+                      "description": "not_working | billing | feature_request | account | other"
+                    },
+                    {
+                      "key": "description",
+                      "value": "I tried to upload photos to a gallery but the upload failed with no error message. I expected the files to appear in the gallery.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "attachments",
+                      "type": "file",
+                      "src": [],
+                      "description": "Optional screenshot or file (PNG, JPG, WebP, GIF, PDF). Up to 5 files."
+                    }
+                  ]
+                },
+                "description": "Submit directly — no email client required. Also accepts JSON without attachments.",
+                "url": "{{baseUrl}}/api/settings/help-support"
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "description": "Home dashboard data in one request: summary stats, storage breakdown, weekly activity chart, recent activity feed, and recent galleries.",
+      "item": [
+        {
+          "name": "Get dashboard",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Has stats', () => pm.expect(body.stats).to.be.an('object'));",
+                  "pm.test('Stats include clients, galleries, inProgress, completed', () => {",
+                  "    pm.expect(body.stats.clients).to.be.a('number');",
+                  "    pm.expect(body.stats.galleries).to.be.a('number');",
+                  "    pm.expect(body.stats.inProgress).to.be.a('number');",
+                  "    pm.expect(body.stats.completed).to.be.a('number');",
+                  "});",
+                  "pm.test('Has storage', () => {",
+                  "    pm.expect(body.storage).to.be.an('object');",
+                  "    pm.expect(body.storage.breakdown).to.be.an('object');",
+                  "    pm.expect(body.storage.focus).to.be.an('object');",
+                  "});",
+                  "pm.test('Has weekly activity', () => {",
+                  "    pm.expect(body.weeklyActivity).to.be.an('object');",
+                  "    pm.expect(body.weeklyActivity.chart).to.be.an('object');",
+                  "    pm.expect(body.weeklyActivity.chart.series).to.be.an('array');",
+                  "});",
+                  "pm.test('Has recent activity and galleries', () => {",
+                  "    pm.expect(body.recentActivity).to.be.an('array');",
+                  "    pm.expect(body.recentGalleries).to.be.an('array');",
+                  "});",
+                  "pm.test('Has user', () => pm.expect(body.user).to.be.an('object'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Returns dashboard widgets in one payload:\n- `stats` — clients, galleries, inProgress (draft + selecting), completed (done)\n- `storage` — used/limit bytes, plan %, breakdown (raws/selections/finals), RAW focus\n- `weeklyActivity` — today, thisWeek, trend, on_track status, 7-day chart series\n- `recentActivity` — gallery feed with action labels (Updated, Proofing, Delivered)\n- `recentGalleries` — gallery cards with cover thumbnails\n- `user` — photographer profile summary",
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard?recentLimit=10&activityDays=7",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "dashboard"],
+              "query": [
+                {
+                  "key": "recentLimit",
+                  "value": "10",
+                  "description": "Max recent galleries/activity items (default 10, max 20)"
+                },
+                {
+                  "key": "activityDays",
+                  "value": "7",
+                  "description": "Chart window in days (default 7, max 30)"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Storage",
+      "item": [
+        {
+          "name": "Get storage",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Has summary', () => pm.expect(body.summary).to.be.an('object'));",
+                  "pm.test('Has galleries', () => pm.expect(body.galleries).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/storage?sort=size&order=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "storage"],
+              "query": [
+                { "key": "sort", "value": "size", "description": "size or name" },
+                { "key": "order", "value": "desc", "description": "asc or desc" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Billing",
+      "description": "Paystack subscription plans. Set PAYSTACK_SECRET_KEY and plan codes in .env. Checkout returns authorizationUrl — open in browser to pay. Webhook: POST /api/billing/webhook.",
+      "item": [
+        {
+          "name": "Get billing config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/billing/config"
+          },
+          "response": []
+        },
+        {
+          "name": "List plans",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Has plans', () => pm.expect(body.plans).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/billing/plans"
+          },
+          "response": []
+        },
+        {
+          "name": "Get subscription",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/billing/subscription"
+          },
+          "response": []
+        },
+        {
+          "name": "Checkout plan (upgrade/switch)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body.checkout?.authorizationUrl) {",
+                  "  pm.collectionVariables.set('paystackAuthorizationUrl', body.checkout.authorizationUrl);",
+                  "  console.log('Open authorizationUrl in browser to complete payment');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"starter\"\n}"
+            },
+            "url": "{{baseUrl}}/api/billing/checkout",
+            "description": "planId: starter | pro | studio. Returns checkout.authorizationUrl — redirect user there to pay with Paystack."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify payment",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/billing/verify?reference=PAYSTACK_REFERENCE",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "billing", "verify"],
+              "query": [{ "key": "reference", "value": "PAYSTACK_REFERENCE" }]
+            },
+            "description": "Optional fallback if webhook is delayed (local dev). Replace reference with Paystack transaction reference."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel subscription",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/billing/cancel",
+            "description": "Cancels Paystack subscription and downgrades account to Free plan."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Clients",
+      "item": [
+        {
+          "name": "List clients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/clients"
+          },
+          "response": []
+        },
+        {
+          "name": "List clients (search)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients?search=acme",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clients"],
+              "query": [{ "key": "search", "value": "acme" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get client",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/clients/{{clientId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Create client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Created (201)', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    const id = json.client && (json.client._id || json.client.id);",
+                  "    if (id) saveClientId(id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Studios\",\n  \"email\": \"contact@acme.com\",\n  \"phone\": \"+233200000000\",\n  \"location\": \"Accra, Ghana\"\n}"
+            },
+            "url": "{{baseUrl}}/api/clients"
+          },
+          "response": []
+        },
+        {
+          "name": "Update client",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Studios (updated)\",\n  \"email\": \"hello@acme.com\",\n  \"phone\": \"+233200000001\",\n  \"location\": \"Kumasi, Ghana\"\n}"
+            },
+            "url": "{{baseUrl}}/api/clients/{{clientId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete client",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/clients/{{clientId}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Galleries",
+      "description": "Requires JWT and `clientId`. Share URL: `{{companySlug}}/{{gallerySlug}}` (activate share link first).\n\n**Customize gallery:** cover focal, design (cover style / grid / fonts), client access (password, downloads), selection limit, background music.\n\n**Uploads tab:** `POST .../uploads` — field `photos` (images + video).\n**Finals tab:** `POST .../finals` — field `finals` (images + video).\n\n**Per-file limits:** images max **100MB**, videos max **1TB**. **Batch:** up to **700 files** per request.",
+      "item": [
+        {
+          "name": "List galleries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/galleries?status=all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "galleries"],
+              "query": [{ "key": "status", "value": "all", "description": "all | draft | selecting | done" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List galleries (search)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/galleries?search=wedding",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "galleries"],
+              "query": [{ "key": "search", "value": "wedding" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List trashed galleries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/galleries?trash=1"
+          },
+          "response": []
+        },
+        {
+          "name": "Generate description (preview)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventName\": \"Sarah & James — wedding day\",\n  \"galleryType\": \"wedding\"\n}"
+            },
+            "url": "{{baseUrl}}/api/galleries/generate-description"
+          },
+          "response": []
+        },
+        {
+          "name": "Create gallery",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Created (201)', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) {",
+                  "    const g = pm.response.json().gallery;",
+                  "    const id = g && (g.id || g._id);",
+                  "    if (id) saveGalleryId(id);",
+                  "    saveGallerySlugs(g);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"{{clientId}}\",\n  \"name\": \"Kwaku Wedding\",\n  \"eventDate\": \"2026-05-18\",\n  \"description\": \"\",\n  \"shareLinkExpiryDays\": 30,\n  \"useDefaultCover\": true,\n  \"generateDescriptionAi\": false\n}"
+            },
+            "url": "{{baseUrl}}/api/galleries"
+          },
+          "response": []
+        },
+        {
+          "name": "Create gallery (AI description)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const g = pm.response.json().gallery;",
+                  "    const id = g && (g.id || g._id);",
+                  "    if (id) saveGalleryId(id);",
+                  "    saveGallerySlugs(g);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"{{clientId}}\",\n  \"name\": \"Studio Portraits, April\",\n  \"galleryType\": \"portraits\",\n  \"eventDate\": \"2026-04-01\",\n  \"shareLinkExpiryDays\": 30,\n  \"useDefaultCover\": true,\n  \"generateDescriptionAi\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/galleries"
+          },
+          "response": []
+        },
+        {
+          "name": "Create gallery (with cover)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const g = pm.response.json().gallery;",
+                  "    const id = g && (g.id || g._id);",
+                  "    if (id) saveGalleryId(id);",
+                  "    saveGallerySlugs(g);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "clientId", "value": "{{clientId}}", "type": "text" },
+                { "key": "name", "value": "Kwaku Wedding", "type": "text" },
+                { "key": "eventDate", "value": "2026-05-18", "type": "text" },
+                { "key": "useDefaultCover", "value": "false", "type": "text" },
+                {
+                  "key": "cover",
+                  "type": "file",
+                  "src": [],
+                  "description": "PNG/JPG/WebP, max 5MB"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/galleries"
+          },
+          "response": []
+        },
+        {
+          "name": "Get gallery",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Get gallery detail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    const g = pm.response.json().gallery;",
+                  "    saveGallerySlugs(g);",
+                  "    if (g?.shareToken) saveShareToken(g.shareToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Hero metadata, stats, shareUrl, design, clientAccess, music, focal point.",
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/detail"
+          },
+          "response": []
+        },
+        {
+          "name": "Gallery analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Engagement metrics: link views, client downloads, selection rate, 7-day activity, media breakdown. Views/downloads are recorded when clients open the share link or download finals.",
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/analytics"
+          },
+          "response": []
+        },
+        {
+          "name": "Gallery meta (types + design)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Shoot/event types for the edit-gallery form (`galleryTypes`) plus customize-gallery design options (`design.coverStyles`, `design.gridStyles`, `design.generalColors`, `design.typography`).",
+            "url": "{{baseUrl}}/api/galleries/meta"
+          },
+          "response": []
+        },
+        {
+          "name": "Edit gallery details",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Updated (200)', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    const g = pm.response.json().gallery;",
+                  "  if (g) saveGallerySlugs(g);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kwaku Wedding (updated)\",\n  \"eventDate\": \"2026-06-05\",\n  \"description\": \"Outdoor ceremony and reception coverage.\",\n  \"galleryType\": \"wedding\",\n  \"slug\": \"kwaku-wedding-2026\"\n}"
+            },
+            "description": "Edit gallery form: event name, date, description, gallery type, and URL slug. Slug must be unique per studio and lowercase with hyphens.",
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Update gallery",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kwaku Wedding (updated)\",\n  \"status\": \"selecting\",\n  \"shareLinkExpiryDays\": 60,\n  \"generateDescriptionAi\": false\n}"
+            },
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Update gallery (with cover)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "useDefaultCover", "value": "false", "type": "text" },
+                {
+                  "key": "cover",
+                  "type": "file",
+                  "src": [],
+                  "description": "Replace cover — PNG/JPG/WebP, max 5MB"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Revert to studio default cover",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"useDefaultCover\": true\n}"
+            },
+            "description": "Removes custom cover file and uses studio default.",
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Mark completed",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "description": "Sets status to `done`. Returns 400 if already completed.",
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/complete"
+          },
+          "response": []
+        },
+        {
+          "name": "Customize gallery",
+          "description": "Client link presentation and access — matches the **Customize gallery** sidebar in the app.\n\n**Design options:** `GET /api/galleries/meta` → `design.coverStyles`, `design.gridStyles`, `design.generalColors`, `design.typography`.\n\n**Cover styles:** cinematic, collage, minimal, bento, overlay, card_based, parallax, hero_carousel, full_bleed, editorial_card, film_border, split_feature.\n\n**Grid styles:** uniform, masonry, bento, split, horizontal_scroll, collage, adaptive.\n\n**General colors:** preset keys (charcoal, ink, forest, wine, navy, clay, stone, cream) or hex `#rrggbb`.\n\n**Typography:** title fonts — Playfair Display, Cormorant Garamond, Libre Baskerville, DM Serif Display; body fonts — Inter, DM Sans, Source Sans 3, Nunito Sans.",
+          "item": [
+        {
+          "name": "Update cover focal point",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"coverFocalX\": 50,\n  \"coverFocalY\": 35\n}"
+            },
+            "description": "Drag focal point for cover crop (0–100%).",
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/cover-focal-point"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload background music",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "src": [],
+                  "description": "MP3, M4A, WAV, AAC, or OGG — max 20MB"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/music"
+          },
+          "response": []
+        },
+        {
+          "name": "Toggle background music",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"backgroundMusicEnabled\": true\n}"
+            },
+            "description": "Upload audio first. Clients hear it on the share gallery when enabled.",
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/music"
+          },
+          "response": []
+        },
+        {
+          "name": "Remove background music",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/music"
+          },
+          "response": []
+        },
+        {
+          "name": "Update selection settings",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"maxSelections\": 20,\n  \"selectionLocked\": false,\n  \"finalDeliveryEnabled\": true\n}"
+            },
+            "description": "Set heart-pick limit (`null` = unlimited), lock client edits, and toggle finals tab.",
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/selection-settings"
+          },
+          "response": []
+        },
+        {
+          "name": "Update gallery design",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"coverStyle\": \"full_bleed\",\n  \"generalColor\": \"cream\",\n  \"gridStyle\": \"masonry\",\n  \"titleFont\": \"Playfair Display\",\n  \"bodyFont\": \"Inter\"\n}"
+            },
+            "description": "Cover style, general color, grid layout, and typography for the client link. `generalColor` and legacy `backdropColor` are both accepted. Saved fields appear on `GET /api/public/...` as `gallery.design`.",
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/design-settings"
+          },
+          "response": []
+        },
+        {
+          "name": "Update client access",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passwordProtected\": true,\n  \"password\": \"{{galleryPassword}}\",\n  \"allowDownloads\": true\n}"
+            },
+            "description": "Password protection and download toggle for the public gallery. Use the same password in **Public Galleries → Unlock gallery**.",
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/client-access"
+          },
+          "response": []
+        }
+          ]
+        },
+        {
+          "name": "Activate share link",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    const g = pm.response.json().gallery;",
+                  "    saveGallerySlugs(g);",
+                  "    if (g?.shareToken) saveShareToken(g.shareToken);",
+                  "    const url = g?.shareUrl;",
+                  "    if (url) console.log('Share URL:', url);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": "Regenerates token + expiry. Share URL: `http://localhost:3000/{{companySlug}}/{{gallerySlug}}`",
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/share-link"
+          },
+          "response": []
+        },
+        {
+          "name": "Revoke share link",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/share-link"
+          },
+          "response": []
+        },
+        {
+          "name": "Uploads",
+          "description": "Raw files tab — images and video (JPG, PNG, WebP, GIF, MP4, MOV, WebM, etc.). Multipart field: `photos`.\n\n**Limits:** each image max **100MB**, each video max **1TB**. Up to **700 files** in one batch.",
+          "item": [
+            {
+              "name": "List uploads",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/uploads"
+              },
+              "response": []
+            },
+            {
+              "name": "Toggle preview watermark",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                      "if (pm.response.code === 200) {",
+                      "    const g = pm.response.json().gallery;",
+                      "    pm.test('watermarkPreviewEnabled present', () => {",
+                      "        pm.expect(g).to.have.property('watermarkPreviewEnabled');",
+                      "    });",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"watermarkPreviewEnabled\": true\n}"
+                },
+                "description": "Upload raw tab — **Add preview watermark**. Persists per gallery; new raw uploads use this when watermark processing runs. Studio default: **Settings → Gallery defaults → Toggle watermark preview**.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/upload-settings"
+              },
+              "response": []
+            },
+            {
+              "name": "Upload files",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Created (201)', () => pm.response.to.have.status(201));",
+                      "if (pm.response.code === 201) {",
+                      "    const created = pm.response.json().created || [];",
+                      "    if (created[0]?.id) savePhotoId(created[0].id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "photos",
+                      "type": "file",
+                      "src": [],
+                      "description": "One or more files — each image max 100MB, each video max 1TB (up to 700 files per request)"
+                    },
+                    {
+                      "key": "onConflict",
+                      "value": "skip",
+                      "type": "text",
+                      "description": "skip | replace | cancel (duplicate filenames)"
+                    }
+                  ]
+                },
+                "description": "Multipart upload. **Per file:** images max 100MB, videos max 1TB. **Batch:** up to 700 files. Optional `onConflict`: skip | replace | cancel.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/uploads"
+              },
+              "response": []
+            },
+            {
+              "name": "Delete photo (soft)",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "description": "30-day restore window.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/uploads/{{photoId}}"
+              },
+              "response": []
+            },
+            {
+              "name": "Restore photo",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/uploads/{{photoId}}/restore"
+              },
+              "response": []
+            },
+            {
+              "name": "Bulk delete uploads",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"photoIds\": [\"{{photoId}}\"]\n}"
+                },
+                "description": "Or `{ \"all\": true }` to trash every upload.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/uploads/bulk-delete"
+              },
+              "response": []
+            },
+            {
+              "name": "Reorder uploads",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Order saved (200)', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"photoIds\": [\"{{photoId}}\"]\n}"
+                },
+                "description": "Dashboard drag-reorder. Send the **full** gallery-wide ordered list of active upload ids (not just the visible set). Backend sets `sortOrder` = array index. Client share URL returns `photos[]` in this order.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/uploads/reorder"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Selections",
+          "description": "Client heart-picks from the share gallery. Each photo includes a `thread` / `comments` array for chat-style feedback.",
+          "item": [
+            {
+              "name": "List client selections",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                      "if (pm.response.code === 200) {",
+                      "    const body = pm.response.json();",
+                      "    const photos = body.photos || [];",
+                      "    if (photos[0]?.id) savePhotoId(photos[0].id);",
+                      "    pm.test('selection meta present', () => {",
+                      "        pm.expect(body).to.have.property('selectionLocked');",
+                      "    });",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/selections"
+              },
+              "response": []
+            },
+            {
+              "name": "Reply to selection comment",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                      "if (pm.response.code === 200) {",
+                      "    const thread = pm.response.json().photo?.thread || [];",
+                      "    pm.test('thread has photographer reply', () => {",
+                      "        pm.expect(thread.some((m) => m.role === 'photographer')).to.be.true;",
+                      "    });",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reply\": \"Got it — I'll crop tighter on this one.\"\n}"
+                },
+                "description": "Photographer response on a client-selected original. Appends to the photo `thread`.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/selections/{{photoId}}/reply"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Finals",
+          "description": "Delivery tab — images and video. Multipart field: `finals`.\n\n**Limits:** each image max **100MB**, each video max **1TB**. Up to **700 files** in one batch.",
+          "item": [
+            {
+              "name": "List finals",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    const finals = pm.response.json().finals || [];",
+                      "    if (finals[0]?.id) saveFinalId(finals[0].id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/finals"
+              },
+              "response": []
+            },
+            {
+              "name": "Toggle logo watermark on finals",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                      "if (pm.response.code === 200) {",
+                      "    const g = pm.response.json().gallery;",
+                      "    pm.test('watermarkFinalsEnabled present', () => {",
+                      "        pm.expect(g).to.have.property('watermarkFinalsEnabled');",
+                      "    });",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"watermarkFinalsEnabled\": true\n}"
+                },
+                "description": "Final images tab — **Add watermark for final images**. Applies brand logo from **Settings → Watermark** to new final uploads when processing runs. Studio default: watermark `enabled` flag.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/final-settings"
+              },
+              "response": []
+            },
+            {
+              "name": "Upload finals (client paid)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    const finals = pm.response.json().finals || [];",
+                      "    if (finals[0]?.id) saveFinalId(finals[0].id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "finals",
+                      "type": "file",
+                      "src": [],
+                      "description": "One or more files — each image max 100MB, each video max 1TB (up to 700 files per request)"
+                    },
+                    { "key": "clientPaid", "value": "true", "type": "text" }
+                  ]
+                },
+                "description": "Multipart upload. **Per file:** images max 100MB, videos max 1TB. **Batch:** up to 700 files.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/finals"
+              },
+              "response": []
+            },
+            {
+              "name": "Upload finals (unpaid + locked)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "finals",
+                      "type": "file",
+                      "src": [],
+                      "description": "One or more files — each image max 100MB, each video max 1TB (up to 700 files per request)"
+                    },
+                    { "key": "clientPaid", "value": "false", "type": "text" },
+                    { "key": "outstandingBalanceGhs", "value": "500", "type": "text" },
+                    { "key": "lockPreviews", "value": "true", "type": "text" }
+                  ]
+                },
+                "description": "Same upload limits as paid finals: images max 100MB each, videos max 1TB each, up to 700 files per batch. Previews locked until client pays.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/finals"
+              },
+              "response": []
+            },
+            {
+              "name": "List flagged finals",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                      "if (pm.response.code === 200) {",
+                      "    const finals = pm.response.json().finals || [];",
+                      "    if (finals[0]?.id) saveFinalId(finals[0].id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "description": "Client-flagged delivered edits with feedback threads.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/finals/flagged"
+              },
+              "response": []
+            },
+            {
+              "name": "Reply to flagged final",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reply\": \"Thanks — re-editing the skin tones now.\"\n}"
+                },
+                "description": "Photographer response on a flagged final. Appends to the final `thread`.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/finals/{{finalId}}/reply"
+              },
+              "response": []
+            },
+            {
+              "name": "Lock final",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"isLocked\": true,\n  \"amountOwing\": 500\n}"
+                },
+                "description": "Lock a final until payment. Accepts `amountOwing`, `outstandingBalanceGhs`, `outstanding_balance_ghs`, or `balance` (GHS). Sets `clientPaid` to false.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/finals/{{finalId}}/lock"
+              },
+              "response": []
+            },
+            {
+              "name": "Unlock final",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"isLocked\": false\n}"
+                },
+                "description": "Unlock a final for client download. Clears amount owing and marks `clientPaid` true.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/finals/{{finalId}}/lock"
+              },
+              "response": []
+            },
+            {
+              "name": "Delete final",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/finals/{{finalId}}"
+              },
+              "response": []
+            },
+            {
+              "name": "Bulk delete finals",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"all\": true\n}"
+                },
+                "description": "Or `{ \"finalIds\": [\"{{finalId}}\"] }`.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/finals/bulk-delete"
+              },
+              "response": []
+            },
+            {
+              "name": "Reorder finals",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Order saved (200)', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"finalIds\": [\"{{finalId}}\"]\n}"
+                },
+                "description": "Dashboard drag-reorder. Send the **full** gallery-wide ordered list of active final ids. Backend sets `sortOrder` = array index. Client share URL returns `finals[]` in this order.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/finals/reorder"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Delete gallery (to trash)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Restore gallery",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/restore"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Trash",
+      "description": "Unified trash view (galleries + files). Items stay for 30 days before automatic permanent deletion. Use **Empty trash** to delete everything immediately.",
+      "item": [
+        {
+          "name": "List trash",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/trash"
+          },
+          "response": []
+        },
+        {
+          "name": "Restore trash items",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"galleryIds\": [\"{{galleryId}}\"],\n  \"photoIds\": [\"{{photoId}}\"]\n}"
+            },
+            "url": "{{baseUrl}}/api/trash/restore"
+          },
+          "response": []
+        },
+        {
+          "name": "Empty trash",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/trash"
+          },
+          "response": []
+        },
+        {
+          "name": "Empty trash (selected)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"galleryIds\": [\"{{galleryId}}\"],\n  \"photoIds\": [\"{{photoId}}\"]\n}"
+            },
+            "url": "{{baseUrl}}/api/trash"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Public Galleries",
+      "description": "No JWT — client-facing share gallery.\n\n**Setup:** Onboarding → Activate share link → (optional) **Customize gallery → Update client access** with password.\n\n**Password flow:** `GET` returns **401** when locked (no preview payload) → **Unlock gallery** returns the **same full payload** as an unlocked `GET`, plus `accessToken` → token auto-attached via `X-Gallery-Access-Token` (collection pre-request).\n\n**Response highlights:** `gallery.design` (cover/grid/fonts), `selectionLimit` / `selectionsRemaining`, `thread` on photos & finals for chat UI.",
+      "item": [
+        {
+          "name": "By slug",
+          "item": [
+            {
+              "name": "View client gallery",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('OK or password required', () => {",
+                      "    pm.expect(pm.response.code).to.be.oneOf([200, 401]);",
+                      "});",
+                      "if (pm.response.code === 401) {",
+                      "    const body = pm.response.json();",
+                      "    pm.test('password gate', () => {",
+                      "        pm.expect(body.accessRequired).to.be.true;",
+                      "        pm.expect(body.passwordRequired).to.be.true;",
+                      "        pm.expect(body).to.not.have.property('gallery');",
+                      "    });",
+                      "} else if (pm.response.code === 200) {",
+                      "    const body = pm.response.json();",
+                      "    const g = body.gallery || {};",
+                      "        pm.test('design present', () => {",
+                      "            pm.expect(g.design).to.be.an('object');",
+                      "            pm.expect(g.design).to.have.property('coverStyle');",
+                      "        });",
+                      "        const photos = body.photos || [];",
+                      "        if (photos[0]?.id) savePhotoId(photos[0].id);",
+                      "        const finals = body.finals || [];",
+                      "    if (finals[0]?.id) saveFinalId(finals[0].id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "auth": { "type": "noauth" },
+                "method": "GET",
+                "header": [],
+                "description": "Full payload when unlocked (or no password). Locked galleries return **401** with `accessRequired` / `passwordRequired` only — use **Unlock gallery** for the full payload.",
+                "url": "{{baseUrl}}/api/public/{{companySlug}}/{{gallerySlug}}"
+              },
+              "response": []
+            },
+            {
+              "name": "Unlock gallery",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                      "if (pm.response.code === 200) {",
+                      "    const body = pm.response.json();",
+                      "    const token = body.accessToken;",
+                      "    if (token) saveGalleryAccessToken(token);",
+                      "    pm.test('full gallery payload', () => {",
+                      "        pm.expect(body.accessRequired).to.be.false;",
+                      "        pm.expect(body.gallery).to.be.an('object');",
+                      "        pm.expect(body.gallery.design).to.be.an('object');",
+                      "        pm.expect(body.photos).to.be.an('array');",
+                      "    });",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "auth": { "type": "noauth" },
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"password\": \"{{galleryPassword}}\"\n}"
+                },
+                "description": "Returns the same full gallery payload as **View client gallery**, plus `accessToken` when the password is correct.",
+                "url": "{{baseUrl}}/api/public/{{companySlug}}/{{gallerySlug}}/unlock"
+              },
+              "response": []
+            },
+            {
+              "name": "Toggle selection (heart)",
+              "request": {
+                "auth": { "type": "noauth" },
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"photoId\": \"{{photoId}}\",\n  \"comment\": \"Love this shot!\"\n}"
+                },
+                "description": "Toggles heart-pick. Respects `selectionLimit`. Blocked when `selectionLocked`. Optional comment appends to `thread`.",
+                "url": "{{baseUrl}}/api/public/{{companySlug}}/{{gallerySlug}}/select"
+              },
+              "response": []
+            },
+            {
+              "name": "Update photo comment",
+              "request": {
+                "auth": { "type": "noauth" },
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"photoId\": \"{{photoId}}\",\n  \"comment\": \"Please crop tighter on this one.\"\n}"
+                },
+                "description": "Appends a client message to the selection `thread`. Blocked when `selectionLocked`.",
+                "url": "{{baseUrl}}/api/public/{{companySlug}}/{{gallerySlug}}/comment"
+              },
+              "response": []
+            },
+            {
+              "name": "Submit selections",
+              "request": {
+                "auth": { "type": "noauth" },
+                "method": "POST",
+                "header": [],
+                "description": "Client submits heart-picks. Can be called again unless `selectionLocked`.",
+                "url": "{{baseUrl}}/api/public/{{companySlug}}/{{gallerySlug}}/submit-selections"
+              },
+              "response": []
+            },
+            {
+              "name": "Flag final (with comment)",
+              "request": {
+                "auth": { "type": "noauth" },
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"comment\": \"Skin tone looks too warm — please re-edit.\"\n}"
+                },
+                "description": "One-way flag on a delivered final. Requires comment. Returns 409 if already flagged.",
+                "url": "{{baseUrl}}/api/public/{{companySlug}}/{{gallerySlug}}/finals/{{finalId}}/flag"
+              },
+              "response": []
+            },
+            {
+              "name": "Update flagged final comment",
+              "request": {
+                "auth": { "type": "noauth" },
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"comment\": \"Updated note: please soften the background.\"\n}"
+                },
+                "description": "Appends another client message to a flagged final's `thread`.",
+                "url": "{{baseUrl}}/api/public/{{companySlug}}/{{gallerySlug}}/finals/{{finalId}}/comment"
+              },
+              "response": []
+            },
+            {
+              "name": "Download final",
+              "request": {
+                "auth": { "type": "noauth" },
+                "method": "GET",
+                "header": [],
+                "description": "Streams an unlocked final. Returns 403 when final is payment-locked, `allowDownloads` is false, or gallery password not unlocked.",
+                "url": "{{baseUrl}}/api/public/{{companySlug}}/{{gallerySlug}}/finals/{{finalId}}/download"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "By share token",
+          "description": "Same actions under `/api/public/token/{{shareToken}}/...` (token saved by **Activate share link**).",
+          "item": [
+            {
+              "name": "View client gallery by token",
+              "request": {
+                "auth": { "type": "noauth" },
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/public/token/{{shareToken}}"
+              },
+              "response": []
+            },
+            {
+              "name": "Unlock gallery by token",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                      "if (pm.response.code === 200) {",
+                      "    const body = pm.response.json();",
+                      "    if (body.accessToken) saveGalleryAccessToken(body.accessToken);",
+                      "    pm.test('full gallery payload', () => {",
+                      "        pm.expect(body.accessRequired).to.be.false;",
+                      "        pm.expect(body.gallery).to.be.an('object');",
+                      "        pm.expect(body.photos).to.be.an('array');",
+                      "    });",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "auth": { "type": "noauth" },
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"password\": \"{{galleryPassword}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/public/token/{{shareToken}}/unlock"
+              },
+              "response": []
+            },
+            {
+              "name": "Toggle selection by token",
+              "request": {
+                "auth": { "type": "noauth" },
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"photoId\": \"{{photoId}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/public/token/{{shareToken}}/select"
+              },
+              "response": []
+            },
+            {
+              "name": "Download final by token",
+              "request": {
+                "auth": { "type": "noauth" },
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/public/token/{{shareToken}}/finals/{{finalId}}/download"
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "description": "Requires JWT + a `clientId` from **Clients → Create client**.",
+      "item": [
+        {
+          "name": "Meta (shoot types)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/bookings/meta"
+          },
+          "response": []
+        },
+        {
+          "name": "Week summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/bookings/week-summary"
+          },
+          "response": []
+        },
+        {
+          "name": "Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/bookings/stats"
+          },
+          "response": []
+        },
+        {
+          "name": "List bookings (month)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings?year=2026&month=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings"],
+              "query": [
+                { "key": "year", "value": "2026" },
+                { "key": "month", "value": "5" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const id = pm.response.json().booking?._id;",
+                  "    if (id) {",
+                  "        pm.collectionVariables.set('bookingId', String(id));",
+                  "        if (pm.environment) pm.environment.set('bookingId', String(id));",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Consultation & planning\",\n  \"clientId\": \"{{clientId}}\",\n  \"date\": \"2026-05-20\",\n  \"shootType\": \"Wedding\",\n  \"amountCharged\": 2500,\n  \"currency\": \"GHS\",\n  \"start\": \"10:00 AM\",\n  \"end\": \"12:00 PM\",\n  \"location\": \"Studio\",\n  \"notes\": \"Optional notes for this booking\"\n}"
+            },
+            "url": "{{baseUrl}}/api/bookings"
+          },
+          "response": []
+        },
+        {
+          "name": "Get booking",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Update booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Updated (200)', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Consultation & planning (updated)\",\n  \"date\": \"2026-05-20\",\n  \"shootType\": \"Wedding\",\n  \"amountCharged\": 3000,\n  \"start\": \"11:00 AM\",\n  \"end\": \"1:00 PM\",\n  \"location\": \"Studio B\",\n  \"notes\": \"Updated notes\"\n}"
+            },
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Deleted (200)', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Upcoming",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/bookings/upcoming"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Income",
+      "description": "Requires JWT + a `clientId` from **Clients → Create client**. Optional `bookingId` from **Bookings → Create booking**.",
+      "item": [
+        {
+          "name": "List income (year)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/income?year=2026",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "income"],
+              "query": [{ "key": "year", "value": "2026" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/income/summary?year=2026",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "income", "summary"],
+              "query": [{ "key": "year", "value": "2026" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create income",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const id = pm.response.json().entry?._id;",
+                  "    if (id) {",
+                  "        pm.collectionVariables.set('incomeId', String(id));",
+                  "        if (pm.environment) pm.environment.set('incomeId', String(id));",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2026-06-18\",\n  \"clientId\": \"{{clientId}}\",\n  \"title\": \"Wedding — Labadi Beach\",\n  \"shootType\": \"Wedding\",\n  \"totalAmount\": 8500,\n  \"amountPaying\": 8500,\n  \"currency\": \"GHS\",\n  \"bookingId\": \"{{bookingId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/income"
+          },
+          "response": []
+        },
+        {
+          "name": "Get income",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/income/{{incomeId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Update income",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2026-06-18\",\n  \"title\": \"Wedding — Labadi Beach (updated)\",\n  \"shootType\": \"Wedding\",\n  \"totalAmount\": 9000,\n  \"amountPaying\": 4500,\n  \"currency\": \"GHS\"\n}"
+            },
+            "url": "{{baseUrl}}/api/income/{{incomeId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete income",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/income/{{incomeId}}"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

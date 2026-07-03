@@ -1,0 +1,32 @@
+{
+  "name": "photo_global_admin",
+  "version": "1.0.0",
+  "description": "Photo Global Admin API — Node.js backend for platform administration",
+  "license": "ISC",
+  "author": "Kwaku",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon index.js",
+    "dev": "nodemon index.js",
+    "create-admin": "node scripts/createAdmin.js",
+    "create-paystack-plans": "node scripts/createPaystackPlans.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1076.0",
+    "@aws-sdk/s3-request-presigner": "^3.1076.0",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "google-auth-library": "^10.6.2",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.5.0",
+    "multer": "^2.1.1",
+    "resend": "^6.16.0",
+    "sharp": "^0.35.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
