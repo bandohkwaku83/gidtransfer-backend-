@@ -117,11 +117,12 @@ export const notifyPhotographerBookingConfirmation = async ({
 
 export const notifyPhotographerBookingReminder = async ({
     ownerId,
+    user: preloadedUser,
     booking,
     client,
     reminderType = "day",
 }) => {
-    const user = await loadPhotographer(ownerId)
+    const user = preloadedUser ?? (await loadPhotographer(ownerId))
     const companySlug = user?.studio?.companySlug
     const studioName = user?.studio?.companyName?.trim() || "there"
     const actionUrl = bookingDetailUrl(booking._id, companySlug)

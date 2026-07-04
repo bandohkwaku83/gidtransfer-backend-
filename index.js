@@ -2,6 +2,7 @@ import fs from "fs"
 import path from "path"
 import { fileURLToPath } from "url"
 import express from "express"
+import compression from "compression"
 import mongoose from "mongoose"
 import dotenv from "dotenv"
 import authRoutes from "./routes/authRoutes.js"
@@ -19,6 +20,8 @@ import emailRoutes from "./routes/emailRoutes.js"
 import adminRoutes from "./routes/adminRoutes.js"
 import trashRoutes from "./routes/trashRoutes.js"
 import billingRoutes from "./routes/billingRoutes.js"
+import syncRoutes from "./routes/syncRoutes.js"
+import eventsRoutes from "./routes/eventsRoutes.js"
 import { paystackWebhook } from "./controllers/billingController.js"
 import Gallery from "./models/Gallery.js"
 import { initAccountIdCounter, migrateMissingAccountIds } from "./utils/accountId.js"
@@ -28,7 +31,9 @@ import { purgeExpiredTrash } from "./utils/galleryTrash.js"
 import { purgeOrphanedGalleryChildren } from "./utils/galleryOrphanCleanup.js"
 import { migrateLegacyEmailVerifiedUsers } from "./utils/emailVerificationMigration.js"
 import { mongoUrlFromEnv } from "./utils/mongoUrlFromEnv.js"
+import { mongoConnectOptions } from "./utils/mongoConnectOptions.js"
 import { buildCorsMiddleware } from "./utils/corsMiddleware.js"
+import { requestTiming } from "./middleware/requestTiming.js"
 import { openAiConfigured } from "./utils/galleryAiDescription.js"
 import { arkeselConfigured } from "./services/arkeselSms.js"
 import { resendConfigured } from "./services/resendEmail.js"
@@ -108,6 +113,16 @@ if (
     app.set("trust proxy", true)
 }
 
+app.use(requestTiming())
+app.use(
+    compression({
+        threshold: Number(process.env.COMPRESSION_THRESHOLD_BYTES ?? 1024),
+        filter: (req, res) => {
+            if (req.headers["x-no-compression"]) return false
+            return compression.filter(req, res)
+        },
+    })
+)
 app.use(buildCorsMiddleware())
 app.post(
     "/api/billing/webhook",
@@ -135,10 +150,24 @@ app.get("/", (_req, res) => {
 
 app.get("/health", (_req, res) => {
     const dbConnected = mongoose.connection.readyState === 1
+    const pool = mongoose.connection.client?.topology?.s?.pool
     res.json({
         ok: true,
         service: "photo_global_admin",
         mongodb: dbConnected ? "connected" : "disconnected",
+        uptimeSeconds: Math.floor(process.uptime()),
+        memory: {
+            rssMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+            heapUsedMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+        },
+        ...(pool
+            ? {
+                  mongoPool: {
+                      totalConnections: pool.totalConnectionCount,
+                      availableConnections: pool.availableConnectionCount,
+                  },
+              }
+            : {}),
     })
 })
 
@@ -219,6 +248,14 @@ app.get("/api", (_req, res) => {
                 },
             },
             dashboard: "GET /api/dashboard",
+            sync: {
+                revision: "GET /api/sync/revision (lightweight cache check — ETag supported)",
+                changes: "GET /api/sync/changes?since=ISO8601 (incremental updates)",
+                batch: "POST /api/sync/batch (JSON: include[] — aggregate multiple resources)",
+            },
+            events: {
+                stream: "GET /api/events/stream (SSE — real-time sync.changed events)",
+            },
             storage: "GET /api/storage?sort=size|name&order=asc|desc",
             billing: {
                 config: "GET /api/billing/config",
@@ -235,7 +272,7 @@ app.get("/api", (_req, res) => {
                 weekSummary: "GET /api/bookings/week-summary",
                 stats: "GET /api/bookings/stats",
                 upcoming: "GET /api/bookings/upcoming",
-                list: "GET /api/bookings?year=&month=&type=",
+                list: "GET /api/bookings?year=&month=&type=&view=summary&since=&fields=&page=&limit=",
                 get: "GET /api/bookings/:id",
                 create: "POST /api/bookings",
                 update: "PUT /api/bookings/:id",
@@ -250,7 +287,7 @@ app.get("/api", (_req, res) => {
                 delete: "DELETE /api/income/:id",
             },
             clients: {
-                list: "GET /api/clients",
+                list: "GET /api/clients?view=summary&since=&fields=&page=&limit=",
                 get: "GET /api/clients/:id",
                 create: "POST /api/clients",
                 update: "PUT /api/clients/:id",
@@ -260,7 +297,7 @@ app.get("/api", (_req, res) => {
                 meta: "GET /api/galleries/meta (gallery types + design options for customize form)",
                 proposeDescription:
                     "POST /api/galleries/generate-description (preview; needs OPENAI_API_KEY)",
-                list: "GET /api/galleries?status=&search=&trash=",
+                list: "GET /api/galleries?status=&search=&trash=&view=summary&since=&fields=&page=&limit=",
                 get: "GET /api/galleries/:id",
                 detail: "GET /api/galleries/:id/detail",
                 analytics: "GET /api/galleries/:id/analytics",
@@ -361,6 +398,8 @@ app.use("/api/income", incomeRoutes)
 app.use("/api/dashboard", dashboardRoutes)
 app.use("/api/storage", storageRoutes)
 app.use("/api/billing", billingRoutes)
+app.use("/api/sync", syncRoutes)
+app.use("/api/events", eventsRoutes)
 
 app.use((_req, res) => {
     res.status(404).json({
@@ -393,7 +432,7 @@ if (!MONGO_URL) {
 }
 
 mongoose
-    .connect(MONGO_URL)
+    .connect(MONGO_URL, mongoConnectOptions())
     .then(async () => {
         console.log("Connected to MongoDB")
         try {
@@ -407,6 +446,8 @@ mongoose
             await GalleryAccessEmail.syncIndexes()
             const { default: User } = await import("./models/User.js")
             await User.syncIndexes()
+            const { default: Booking } = await import("./models/Booking.js")
+            await Booking.syncIndexes()
             const accountIdsMigrated = await migrateMissingAccountIds()
             if (accountIdsMigrated > 0) {
                 console.log(

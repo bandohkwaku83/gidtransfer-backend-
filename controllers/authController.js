@@ -19,6 +19,7 @@ import {
     resendCooldownRemainingSeconds,
 } from "../utils/emailVerification.js"
 import { verifyGoogleIdToken } from "../utils/verifyGoogleIdToken.js"
+import { cacheDeletePrefix } from "../utils/memoryCache.js"
 
 const authSuccess = (user, message = "Login successful") => ({
     message,
@@ -139,6 +140,7 @@ export const logout = async (req, res) => {
     try {
         req.user.tokenVersion = (req.user.tokenVersion ?? 0) + 1
         await req.user.save()
+        cacheDeletePrefix(`auth:user:${req.user._id}:`)
 
         return res.status(200).json({ message: "Signed out successfully" })
     } catch (error) {

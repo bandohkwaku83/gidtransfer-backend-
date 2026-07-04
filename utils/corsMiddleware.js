@@ -30,6 +30,12 @@ export function buildCorsMiddleware() {
         origin: originOption,
         credentials: true,
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+        exposedHeaders: [
+            "ETag",
+            "Server-Timing",
+            "X-Sync-Revision",
+            "X-API-Latency-Budget-Ms",
+        ],
         maxAge: 86_400,
     })
 }

@@ -11,11 +11,24 @@ import {
     attachGalleryCounts,
     buildGalleryListFilter,
     formatGalleryResponse,
+    formatGallerySummaryResponse,
     galleryNotDeletedFilter,
     galleryOwnerFilter,
+    invalidateGalleryCounts,
     parseGenerateDescriptionAi,
     parseGalleryInput,
 } from "../utils/galleryFields.js"
+import {
+    buildChangedSinceFilter,
+    parseSinceQuery,
+} from "../utils/incrementalSync.js"
+import { isSummaryView } from "../utils/sparseFields.js"
+import { sendOwnerJson } from "../utils/listResponse.js"
+import {
+    buildPaginationMeta,
+    paginatedQuery,
+    parsePagination,
+} from "../utils/pagination.js"
 import {
     deleteGalleryCoverFile,
     saveGalleryCoverFile,
@@ -133,14 +146,48 @@ export const listGalleries = async (req, res) => {
             return res.status(400).json({ message: built.error ?? "Invalid filter" })
         }
 
-        const rows = await Gallery.find(built.filter)
-            .populate(populateGalleryBasic)
-            .sort({ updatedAt: -1 })
-            .exec()
+        const sinceParsed = parseSinceQuery(req.query)
+        if (sinceParsed?.error) {
+            return res.status(400).json({ message: sinceParsed.error })
+        }
+        if (sinceParsed?.since) {
+            Object.assign(built.filter, buildChangedSinceFilter(sinceParsed.since))
+        }
 
-        const galleries = rows.map(formatGalleryResponse)
+        const pagination = parsePagination(req.query, { defaultLimit: 50, maxLimit: 100 })
+        const summary = isSummaryView(req.query)
+
+        const [total, rows] = await Promise.all([
+            Gallery.countDocuments(built.filter),
+            paginatedQuery(
+                Gallery.find(built.filter)
+                    .populate(populateGalleryBasic)
+                    .sort({ updatedAt: -1 }),
+                pagination
+            ).exec(),
+        ])
+
+        const formatRow = summary ? formatGallerySummaryResponse : formatGalleryResponse
+        const galleries = rows.map(formatRow)
         const counts = await attachGalleryCounts(req.user._id)
-        return res.status(200).json({ counts, galleries })
+
+        return sendOwnerJson(
+            req,
+            res,
+            req.user._id,
+            {
+                counts,
+                galleries,
+                pagination: buildPaginationMeta({ ...pagination, total }),
+            },
+            {
+                etagSeed: {
+                    since: sinceParsed?.since?.toISOString() ?? null,
+                    view: summary ? "summary" : "full",
+                    status: req.query.status ?? null,
+                },
+            }
+        )
     } catch (error) {
         console.error("listGalleries:", error)
         return res.status(500).json({ message: "Server error" })
@@ -257,6 +304,7 @@ export const createGallery = async (req, res) => {
         }
 
         await gallery.populate(populateGalleryBasic)
+        invalidateGalleryCounts(req.user._id)
         return res.status(201).json({
             message: "Gallery created",
             gallery: formatGalleryResponse(gallery),
@@ -405,6 +453,7 @@ export const updateGallery = async (req, res) => {
         }
 
         await gallery.populate(populateGalleryBasic)
+        invalidateGalleryCounts(req.user._id)
         return res.status(200).json({
             message: "Gallery updated",
             gallery: formatGalleryResponse(gallery),
@@ -458,6 +507,7 @@ export const deleteGallery = async (req, res) => {
         })
 
         const updated = await Gallery.findById(gallery._id)
+        invalidateGalleryCounts(req.user._id)
 
         return res.status(200).json({
             message: "Gallery moved to trash",
@@ -494,6 +544,7 @@ export const restoreGallery = async (req, res) => {
         await gallery.save()
 
         await gallery.populate(populateGalleryBasic)
+        invalidateGalleryCounts(req.user._id)
 
         return res.status(200).json({
             message: "Gallery restored",

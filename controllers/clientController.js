@@ -3,8 +3,18 @@ import Client from "../models/Client.js"
 import {
     buildClientSearchFilter,
     clientOwnerFilter,
+    formatClientSummary,
     parseClientInput,
 } from "../utils/clientFields.js"
+import {
+    buildPaginationMeta,
+    paginatedQuery,
+    parsePagination,
+} from "../utils/pagination.js"
+import { buildUpdatedSinceFilter, parseSinceQuery } from "../utils/incrementalSync.js"
+import { isSummaryView } from "../utils/sparseFields.js"
+import { sendOwnerJson } from "../utils/listResponse.js"
+import { publishOwnerChange } from "../utils/syncRevision.js"
 
 const validationMessage = (error) =>
     Object.values(error.errors)
@@ -23,15 +33,47 @@ const findOwnedClient = (id, userId) => {
 export const listClients = async (req, res) => {
     try {
         const search = req.query.search ?? req.query.q
+        const sinceParsed = parseSinceQuery(req.query)
+        if (sinceParsed?.error) {
+            return res.status(400).json({ message: sinceParsed.error })
+        }
+
+        const pagination = parsePagination(req.query, { defaultLimit: 50, maxLimit: 200 })
         const filter = {
             ...clientOwnerFilter(req.user._id),
             ...buildClientSearchFilter(search),
+            ...(sinceParsed?.since
+                ? buildUpdatedSinceFilter(sinceParsed.since)
+                : {}),
         }
+        const summary = isSummaryView(req.query)
 
-        const clients = await Client.find(filter).sort({ createdAt: -1 })
-        const count = clients.length
+        const [total, rows] = await Promise.all([
+            Client.countDocuments(filter),
+            paginatedQuery(
+                Client.find(filter).sort({ createdAt: -1 }),
+                pagination
+            ).exec(),
+        ])
 
-        return res.status(200).json({ count, clients })
+        const clients = summary ? rows.map(formatClientSummary) : rows
+
+        return sendOwnerJson(
+            req,
+            res,
+            req.user._id,
+            {
+                count: total,
+                clients,
+                pagination: buildPaginationMeta({ ...pagination, total }),
+            },
+            {
+                etagSeed: {
+                    since: sinceParsed?.since?.toISOString() ?? null,
+                    view: summary ? "summary" : "full",
+                },
+            }
+        )
     } catch (error) {
         console.error("List clients error:", error)
         return res.status(500).json({ message: "Server error" })
@@ -69,6 +111,8 @@ export const createClient = async (req, res) => {
             ...fields,
             owner: req.user._id,
         })
+
+        await publishOwnerChange(req.user._id)
 
         return res.status(201).json({
             message: "Client created successfully",
@@ -108,6 +152,8 @@ export const updateClient = async (req, res) => {
             return res.status(404).json({ message: "Client not found" })
         }
 
+        await publishOwnerChange(req.user._id)
+
         return res.status(200).json({
             message: "Client updated successfully",
             client,
@@ -136,6 +182,8 @@ export const deleteClient = async (req, res) => {
         if (!client) {
             return res.status(404).json({ message: "Client not found" })
         }
+
+        await publishOwnerChange(req.user._id)
 
         return res.status(200).json({
             message: "Client deleted successfully",

@@ -46,6 +46,18 @@ export const formatClientEmbed = (client) => {
     }
 }
 
+export const formatClientSummary = (client) => {
+    const full = formatClientEmbed(client)
+    if (!full) return null
+    return {
+        id: full.id,
+        name: full.name,
+        email: full.email,
+        phone: full.phone,
+        updatedAt: full.updatedAt,
+    }
+}
+
 export const parseClientInput = (body, { partial = false } = {}) => {
     const { name, email, phone, contactNumber, location } = body
     const fields = {}

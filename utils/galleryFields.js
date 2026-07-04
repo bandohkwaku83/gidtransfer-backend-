@@ -11,6 +11,18 @@ import {
     normalizeShootCategory,
     shootTypeLabel,
 } from "./bookingShootTypes.js"
+import { cacheDelete, cacheGetOrSet } from "./memoryCache.js"
+
+const GALLERY_COUNTS_CACHE_TTL_MS = Number(process.env.GALLERY_COUNTS_CACHE_TTL_MS ?? 30_000)
+
+export const galleryCountsCacheKey = (ownerId) => `gallery-counts:${ownerId}`
+
+export const invalidateGalleryCounts = (ownerId) => {
+    cacheDelete(galleryCountsCacheKey(ownerId))
+    import("./syncRevision.js")
+        .then(({ publishOwnerChange }) => publishOwnerChange(ownerId))
+        .catch(() => {})
+}
 
 export const galleryOwnerFilter = (userId) => ({
     owner: userId,
@@ -384,22 +396,76 @@ export const formatGalleryResponse = (galleryDoc) => {
     }
 }
 
-export const attachGalleryCounts = async (ownerId) => {
-    const activeBase = {
-        ...galleryOwnerFilter(ownerId),
-        ...galleryNotDeletedFilter(),
+/** Compact card/list shape — fewer fields for list views and incremental sync. */
+export const formatGallerySummaryResponse = (galleryDoc) => {
+    const plain = galleryDoc.toObject?.({ virtuals: true }) ?? galleryDoc
+    const clientBrief = formatClientEmbed(plain.client)
+    const shareActive = computeShareActive(plain)
+    const displayCoverUrl =
+        plain.useDefaultCover === true ? null : plain.coverImageUrl ?? null
+
+    return {
+        id: plain._id ?? plain.id,
+        name: plain.name,
+        status: plain.status,
+        eventDate: plain.eventDate,
+        galleryType: plain.galleryType ?? null,
+        clientId: clientBrief?.id ?? null,
+        clientName: clientBrief?.name ?? null,
+        displayCoverUrl,
+        isShared: shareActive,
+        deletedAt: plain.deletedAt ?? null,
+        updatedAt: plain.updatedAt,
+        createdAt: plain.createdAt,
     }
+}
 
-    const [all, draft, selecting, done, trash] = await Promise.all([
-        Gallery.countDocuments(activeBase),
-        Gallery.countDocuments({ ...activeBase, status: "draft" }),
-        Gallery.countDocuments({ ...activeBase, status: "selecting" }),
-        Gallery.countDocuments({ ...activeBase, status: "done" }),
-        Gallery.countDocuments({
-            ...galleryOwnerFilter(ownerId),
-            ...galleryTrashedOnlyFilter(),
-        }),
-    ])
+export const attachGalleryCounts = async (ownerId) => {
+    const ownerKey = String(ownerId)
+    return cacheGetOrSet(
+        galleryCountsCacheKey(ownerKey),
+        async () => {
+            const ownerObjectId =
+                ownerId instanceof mongoose.Types.ObjectId
+                    ? ownerId
+                    : new mongoose.Types.ObjectId(ownerKey)
+            const [result] = await Gallery.aggregate([
+                { $match: { owner: ownerObjectId } },
+                {
+                    $facet: {
+                        all: [
+                            { $match: { deletedAt: null } },
+                            { $count: "n" },
+                        ],
+                        draft: [
+                            { $match: { deletedAt: null, status: "draft" } },
+                            { $count: "n" },
+                        ],
+                        selecting: [
+                            { $match: { deletedAt: null, status: "selecting" } },
+                            { $count: "n" },
+                        ],
+                        done: [
+                            { $match: { deletedAt: null, status: "done" } },
+                            { $count: "n" },
+                        ],
+                        trash: [
+                            { $match: { deletedAt: { $ne: null } } },
+                            { $count: "n" },
+                        ],
+                    },
+                },
+            ])
 
-    return { all, draft, selecting, done, trash }
+            const pick = (arr) => arr?.[0]?.n ?? 0
+            return {
+                all: pick(result.all),
+                draft: pick(result.draft),
+                selecting: pick(result.selecting),
+                done: pick(result.done),
+                trash: pick(result.trash),
+            }
+        },
+        GALLERY_COUNTS_CACHE_TTL_MS
+    )
 }

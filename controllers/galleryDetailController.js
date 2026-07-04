@@ -5,6 +5,7 @@ import {
     formatGalleryDetailResponse,
     loadOwnedGallery,
 } from "../utils/galleryDetailHelpers.js"
+import { invalidateGalleryCounts } from "../utils/galleryFields.js"
 import {
     deleteGalleryMusicFile,
     saveGalleryMusicFile,
@@ -64,6 +65,7 @@ export const markGalleryCompleted = async (req, res) => {
         gallery.status = "done"
         await gallery.save()
         await gallery.populate(populateGalleryBasic)
+        invalidateGalleryCounts(req.user._id)
 
         const detail = await formatGalleryDetailResponse(gallery)
         return res.status(200).json({

@@ -30,6 +30,11 @@ import {
     persistGalleryMediaReorder,
     validateGalleryReorderIds,
 } from "../utils/galleryMediaOrder.js"
+import {
+    buildPaginationMeta,
+    paginatedQuery,
+    parsePagination,
+} from "../utils/pagination.js"
 
 const parseOnConflict = (value) => {
     const s = String(value ?? "skip").trim().toLowerCase()
@@ -159,9 +164,19 @@ export const listGalleryUploads = async (req, res) => {
             filter.deletedAt = null
         }
 
-        const rows = await GalleryPhoto.find(filter).sort(GALLERY_MEDIA_SORT).exec()
+        const pagination = parsePagination(req.query, { defaultLimit: 200, maxLimit: 500 })
+
+        const [total, rows] = await Promise.all([
+            GalleryPhoto.countDocuments(filter),
+            paginatedQuery(
+                GalleryPhoto.find(filter).sort(GALLERY_MEDIA_SORT),
+                pagination
+            ).exec(),
+        ])
+
         return res.status(200).json({
             photos: rows.map(formatGalleryPhotoResponse),
+            pagination: buildPaginationMeta({ ...pagination, total }),
         })
     } catch (error) {
         console.error("listGalleryUploads:", error)
@@ -189,38 +204,45 @@ export const presignGalleryPhotoUploads = async (req, res) => {
             return res.status(400).json({ message: parsed.error })
         }
 
-        const uploads = []
         for (const file of parsed.files) {
             const err = validateGalleryPhotoMeta(file)
             if (err) {
                 return res.status(400).json({ message: err })
             }
-
-            try {
-                const presigned = await createGalleryPhotoPresignedUpload({
-                    galleryId: gallery._id,
-                    mimeType: file.mimeType,
-                    sizeBytes: file.sizeBytes,
-                })
-                uploads.push({
-                    uploadId: presigned.uploadId,
-                    storedFilename: presigned.storedFilename,
-                    originalFilename: file.originalFilename,
-                    mimeType: file.mimeType,
-                    sizeBytes: file.sizeBytes,
-                    presignedUrl: presigned.presignedUrl,
-                    method: presigned.method,
-                    headers: presigned.headers,
-                    publicUrl: presigned.publicUrl,
-                    expiresIn: presigned.expiresIn,
-                })
-            } catch (err) {
-                return res.status(400).json({ message: err.message })
-            }
         }
+
+        const uploads = await Promise.all(
+            parsed.files.map(async (file) => {
+                try {
+                    const presigned = await createGalleryPhotoPresignedUpload({
+                        galleryId: gallery._id,
+                        mimeType: file.mimeType,
+                        sizeBytes: file.sizeBytes,
+                    })
+                    return {
+                        uploadId: presigned.uploadId,
+                        storedFilename: presigned.storedFilename,
+                        originalFilename: file.originalFilename,
+                        mimeType: file.mimeType,
+                        sizeBytes: file.sizeBytes,
+                        presignedUrl: presigned.presignedUrl,
+                        method: presigned.method,
+                        headers: presigned.headers,
+                        publicUrl: presigned.publicUrl,
+                        expiresIn: presigned.expiresIn,
+                    }
+                } catch (err) {
+                    err.statusCode = 400
+                    throw err
+                }
+            })
+        )
 
         return res.status(200).json({ uploads })
     } catch (error) {
+        if (error?.statusCode === 400) {
+            return res.status(400).json({ message: error.message })
+        }
         console.error("presignGalleryPhotoUploads:", error)
         return res.status(500).json({ message: "Server error" })
     }
@@ -255,15 +277,22 @@ export const completeGalleryPhotoUploads = async (req, res) => {
             if (err) {
                 return res.status(400).json({ message: err })
             }
-            const verifyErr = await verifyGalleryPhotoInStorage({
-                galleryId: gallery._id,
-                storedFilename: file.storedFilename,
-                mimeType: file.mimeType,
-                sizeBytes: file.sizeBytes,
-            })
-            if (verifyErr) {
-                return res.status(400).json({ message: verifyErr })
-            }
+        }
+
+        const verifyResults = await Promise.all(
+            parsed.files.map(async (file) => ({
+                file,
+                verifyErr: await verifyGalleryPhotoInStorage({
+                    galleryId: gallery._id,
+                    storedFilename: file.storedFilename,
+                    mimeType: file.mimeType,
+                    sizeBytes: file.sizeBytes,
+                }),
+            }))
+        )
+        const failedVerify = verifyResults.find((result) => result.verifyErr)
+        if (failedVerify) {
+            return res.status(400).json({ message: failedVerify.verifyErr })
         }
 
         const onConflict = parseOnConflict(

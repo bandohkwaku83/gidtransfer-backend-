@@ -29,6 +29,11 @@ import {
     validateGalleryReorderIds,
 } from "../utils/galleryMediaOrder.js"
 import {
+    buildPaginationMeta,
+    paginatedQuery,
+    parsePagination,
+} from "../utils/pagination.js"
+import {
     resolveGalleryFinalLockUpdate,
     resolveGalleryFinalUploadPayment,
 } from "../utils/galleryFinalPaymentFields.js"
@@ -50,12 +55,19 @@ export const listGalleryFinals = async (req, res) => {
             filter.deletedAt = null
         }
 
-        const rows = await GalleryFinal.find(filter)
-            .sort(GALLERY_MEDIA_SORT)
-            .exec()
+        const pagination = parsePagination(req.query, { defaultLimit: 200, maxLimit: 500 })
+
+        const [total, rows] = await Promise.all([
+            GalleryFinal.countDocuments(filter),
+            paginatedQuery(
+                GalleryFinal.find(filter).sort(GALLERY_MEDIA_SORT),
+                pagination
+            ).exec(),
+        ])
 
         return res.status(200).json({
             finals: rows.map(formatGalleryFinalResponse),
+            pagination: buildPaginationMeta({ ...pagination, total }),
         })
     } catch (error) {
         console.error("listGalleryFinals:", error)
@@ -117,20 +129,21 @@ export const presignGalleryFinalUploads = async (req, res) => {
             return res.status(400).json({ message: parsed.error })
         }
 
-        const uploads = []
         for (const file of parsed.files) {
             const err = validateGalleryFinalMeta(file)
             if (err) {
                 return res.status(400).json({ message: err })
             }
+        }
 
-            try {
+        const uploads = await Promise.all(
+            parsed.files.map(async (file) => {
                 const presigned = await createGalleryFinalPresignedUpload({
                     galleryId: gallery._id,
                     mimeType: file.mimeType,
                     sizeBytes: file.sizeBytes,
                 })
-                uploads.push({
+                return {
                     uploadId: presigned.uploadId,
                     storedFilename: presigned.storedFilename,
                     originalFilename: file.originalFilename,
@@ -141,11 +154,9 @@ export const presignGalleryFinalUploads = async (req, res) => {
                     headers: presigned.headers,
                     publicUrl: presigned.publicUrl,
                     expiresIn: presigned.expiresIn,
-                })
-            } catch (err) {
-                return res.status(400).json({ message: err.message })
-            }
-        }
+                }
+            })
+        )
 
         return res.status(200).json({ uploads })
     } catch (error) {
@@ -183,15 +194,22 @@ export const completeGalleryFinalUploads = async (req, res) => {
             if (err) {
                 return res.status(400).json({ message: err })
             }
-            const verifyErr = await verifyGalleryFinalInStorage({
-                galleryId: gallery._id,
-                storedFilename: file.storedFilename,
-                mimeType: file.mimeType,
-                sizeBytes: file.sizeBytes,
-            })
-            if (verifyErr) {
-                return res.status(400).json({ message: verifyErr })
-            }
+        }
+
+        const verifyResults = await Promise.all(
+            parsed.files.map(async (file) => ({
+                file,
+                verifyErr: await verifyGalleryFinalInStorage({
+                    galleryId: gallery._id,
+                    storedFilename: file.storedFilename,
+                    mimeType: file.mimeType,
+                    sizeBytes: file.sizeBytes,
+                }),
+            }))
+        )
+        const failedVerify = verifyResults.find((result) => result.verifyErr)
+        if (failedVerify) {
+            return res.status(400).json({ message: failedVerify.verifyErr })
         }
 
         const setResolved = await resolveGallerySetIdForUpload(gallery._id, req.body)

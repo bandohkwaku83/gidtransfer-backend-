@@ -6,6 +6,7 @@ import {
     bookingOwnerFilter,
     buildBookingListFilter,
     formatBookingResponse,
+    formatBookingSummary,
     parseBookingInput,
     weekRangeLocal,
 } from "../utils/bookingFields.js"
@@ -16,6 +17,15 @@ import {
     notifyPhotographerBookingConfirmation,
     queuePhotographerEmail,
 } from "../utils/photographerNotifications.js"
+import {
+    buildPaginationMeta,
+    paginatedQuery,
+    parsePagination,
+} from "../utils/pagination.js"
+import { buildUpdatedSinceFilter, parseSinceQuery } from "../utils/incrementalSync.js"
+import { isSummaryView } from "../utils/sparseFields.js"
+import { sendOwnerJson } from "../utils/listResponse.js"
+import { publishOwnerChange } from "../utils/syncRevision.js"
 
 const validationMessage = (error) =>
     Object.values(error.errors)
@@ -158,14 +168,44 @@ export const listBookings = async (req, res) => {
             day: req.query.day,
         })
 
-        const bookings = await Booking.find(filter)
-            .populate(populateClient)
-            .sort({ startsAt: 1 })
+        const sinceParsed = parseSinceQuery(req.query)
+        if (sinceParsed?.error) {
+            return res.status(400).json({ message: sinceParsed.error })
+        }
+        if (sinceParsed?.since) {
+            Object.assign(filter, buildUpdatedSinceFilter(sinceParsed.since))
+        }
 
-        return res.status(200).json({
-            count: bookings.length,
-            bookings: bookings.map(formatBookingResponse),
-        })
+        const pagination = parsePagination(req.query, { defaultLimit: 100, maxLimit: 500 })
+        const summary = isSummaryView(req.query)
+
+        const [total, rows] = await Promise.all([
+            Booking.countDocuments(filter),
+            paginatedQuery(
+                Booking.find(filter).populate(populateClient).sort({ startsAt: 1 }),
+                pagination
+            ).exec(),
+        ])
+
+        const formatRow = summary ? formatBookingSummary : formatBookingResponse
+        const bookings = rows.map(formatRow)
+
+        return sendOwnerJson(
+            req,
+            res,
+            req.user._id,
+            {
+                count: total,
+                bookings,
+                pagination: buildPaginationMeta({ ...pagination, total }),
+            },
+            {
+                etagSeed: {
+                    since: sinceParsed?.since?.toISOString() ?? null,
+                    view: summary ? "summary" : "full",
+                },
+            }
+        )
     } catch (error) {
         console.error("List bookings error:", error)
         return res.status(500).json({ message: "Server error" })
@@ -269,6 +309,8 @@ export const createBooking = async (req, res) => {
             })
         )
 
+        await publishOwnerChange(req.user._id)
+
         return res.status(201).json({
             message: "Booking created successfully",
             booking: formatBookingResponse(booking),
@@ -337,6 +379,8 @@ export const updateBooking = async (req, res) => {
         await existing.save()
         await existing.populate(populateClient)
 
+        await publishOwnerChange(req.user._id)
+
         return res.status(200).json({
             message: "Booking updated successfully",
             booking: formatBookingResponse(existing),
@@ -365,6 +409,8 @@ export const deleteBooking = async (req, res) => {
         if (!booking) {
             return res.status(404).json({ message: "Booking not found" })
         }
+
+        await publishOwnerChange(req.user._id)
 
         return res.status(200).json({
             message: "Booking deleted successfully",

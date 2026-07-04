@@ -15,6 +15,11 @@ import {
     parseIncomeInput,
     validateIncomeAmounts,
 } from "../utils/incomeFields.js"
+import {
+    buildPaginationMeta,
+    paginatedQuery,
+    parsePagination,
+} from "../utils/pagination.js"
 
 const validationMessage = (error) =>
     Object.values(error.errors)
@@ -83,11 +88,17 @@ export const listIncome = async (req, res) => {
             year: req.query.year,
         })
 
-        const entries = await Income.find(filter).sort({ date: -1 })
+        const pagination = parsePagination(req.query, { defaultLimit: 100, maxLimit: 500 })
+
+        const [total, entries] = await Promise.all([
+            Income.countDocuments(filter),
+            paginatedQuery(Income.find(filter).sort({ date: -1 }), pagination).exec(),
+        ])
 
         return res.status(200).json({
-            count: entries.length,
+            count: total,
             entries: entries.map(formatIncomeResponse),
+            pagination: buildPaginationMeta({ ...pagination, total }),
         })
     } catch (error) {
         console.error("List income error:", error)

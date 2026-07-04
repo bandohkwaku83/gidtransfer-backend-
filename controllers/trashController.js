@@ -7,6 +7,7 @@ import {
     galleryNotDeletedFilter,
     galleryOwnerFilter,
     galleryTrashedOnlyFilter,
+    invalidateGalleryCounts,
 } from "../utils/galleryFields.js"
 import {
     formatGalleryFinalResponse,
@@ -251,6 +252,8 @@ export const restoreTrashItems = async (req, res) => {
     } catch (error) {
         console.error("restoreTrashItems:", error)
         return res.status(500).json({ message: "Server error" })
+    } finally {
+        invalidateGalleryCounts(req.user._id)
     }
 }
 
@@ -312,5 +315,7 @@ export const emptyTrash = async (req, res) => {
     } catch (error) {
         console.error("emptyTrash:", error)
         return res.status(500).json({ message: "Server error" })
+    } finally {
+        invalidateGalleryCounts(req.user._id)
     }
 }

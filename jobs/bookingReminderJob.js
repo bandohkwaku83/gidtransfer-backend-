@@ -1,4 +1,5 @@
 import Booking from "../models/Booking.js"
+import User from "../models/User.js"
 import {
     notifyPhotographerBookingReminder,
     queuePhotographerEmail,
@@ -49,6 +50,17 @@ const buildDueReminderQuery = (now, { leadHours, sentAtField }) => {
     }
 }
 
+const loadPhotographersById = async (bookings) => {
+    const ownerIds = [...new Set(bookings.map((booking) => String(booking.owner)))]
+    if (!ownerIds.length) return new Map()
+
+    const photographers = await User.find({ _id: { $in: ownerIds } })
+        .select("email studio emailNotifications isActive")
+        .lean()
+
+    return new Map(photographers.map((user) => [String(user._id), user]))
+}
+
 const processReminderSchedule = async (now, schedule) => {
     const bookings = await Booking.find(buildDueReminderQuery(now, schedule))
         .populate({ path: "client", select: "name email phone" })
@@ -56,22 +68,30 @@ const processReminderSchedule = async (now, schedule) => {
         .limit(100)
         .exec()
 
+    const photographersById = await loadPhotographersById(bookings)
+
     let sent = 0
     let skipped = 0
     let failed = 0
+    const bulkOps = []
 
     for (const booking of bookings) {
         try {
             const result = await notifyPhotographerBookingReminder({
                 ownerId: booking.owner,
+                user: photographersById.get(String(booking.owner)),
                 booking,
                 client: booking.client,
                 reminderType: schedule.type,
             })
 
             if (result?.sent) {
-                booking[schedule.sentAtField] = new Date()
-                await booking.save()
+                bulkOps.push({
+                    updateOne: {
+                        filter: { _id: booking._id },
+                        update: { $set: { [schedule.sentAtField]: new Date() } },
+                    },
+                })
                 sent += 1
             } else {
                 skipped += 1
@@ -83,6 +103,10 @@ const processReminderSchedule = async (now, schedule) => {
                 error.message
             )
         }
+    }
+
+    if (bulkOps.length) {
+        await Booking.bulkWrite(bulkOps, { ordered: false })
     }
 
     return { checked: bookings.length, sent, skipped, failed }

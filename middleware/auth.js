@@ -1,5 +1,19 @@
 import jwt from "jsonwebtoken"
 import Admin from "../models/Admin.js"
+import { cacheGetOrSet } from "../utils/memoryCache.js"
+
+const AUTH_CACHE_TTL_MS = Number(process.env.AUTH_CACHE_TTL_MS ?? 60_000)
+
+const loadActiveAdmin = async (adminId) =>
+    cacheGetOrSet(
+        `auth:admin:${adminId}`,
+        async () => {
+            const admin = await Admin.findById(adminId).lean()
+            if (!admin || !admin.isActive) return null
+            return admin
+        },
+        AUTH_CACHE_TTL_MS
+    )
 
 export const protect = async (req, res, next) => {
     try {
@@ -17,12 +31,12 @@ export const protect = async (req, res, next) => {
             return res.status(401).json({ message: "Not authorized, token invalid" })
         }
 
-        const admin = await Admin.findById(decoded.id)
-        if (!admin || !admin.isActive) {
+        const admin = await loadActiveAdmin(decoded.id)
+        if (!admin) {
             return res.status(401).json({ message: "Admin no longer exists" })
         }
 
-        req.admin = admin
+        req.admin = Admin.hydrate(admin)
         next()
     } catch {
         return res.status(401).json({ message: "Not authorized, token invalid" })

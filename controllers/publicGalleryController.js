@@ -54,6 +54,11 @@ import {
     notifyPhotographerSelectionsSubmitted,
     queuePhotographerEmail,
 } from "../utils/photographerNotifications.js"
+import { publishOwnerChange } from "../utils/syncRevision.js"
+import {
+    buildPaginationMeta,
+    parsePagination,
+} from "../utils/pagination.js"
 
 function galleryClientName(gallery) {
     return gallery.client?.name?.trim() || "Your client"
@@ -114,30 +119,76 @@ function formatPublicGalleryMeta(gallery, { selectedCount = 0 } = {}) {
     }
 }
 
-async function buildPublicGalleryPayload(hit) {
+async function buildPublicGalleryPayload(hit, { query } = {}) {
     const { gallery, owner } = hit
     const companySlug = owner.studio?.companySlug ?? null
     const allowDownloads = gallery.allowDownloads !== false
 
-    const [photos, selected, finals, setRows] = await Promise.all([
-        GalleryPhoto.find(galleryPublicBrowsePhotoFilter(gallery._id))
-            .sort(GALLERY_MEDIA_SORT)
-            .exec(),
-        GalleryPhoto.find(galleryClientSelectionPhotoFilter(gallery._id))
-            .sort(galleryClientSelectionPhotoSort)
-            .exec(),
-        gallery.finalDeliveryEnabled !== false
-            ? GalleryFinal.find({
-                  gallery: gallery._id,
-                  deletedAt: null,
-              })
-                  .sort(GALLERY_MEDIA_SORT)
-                  .exec()
-            : Promise.resolve([]),
-        GallerySet.find({ gallery: gallery._id })
-            .sort({ sortOrder: 1, createdAt: 1 })
-            .exec(),
-    ])
+    const photosPagination =
+        query?.photosPage != null ||
+        query?.photosLimit != null ||
+        query?.page != null ||
+        query?.limit != null
+            ? parsePagination(
+                  {
+                      page: query?.photosPage ?? query?.page,
+                      limit: query?.photosLimit ?? query?.limit,
+                  },
+                  { defaultLimit: 100, maxLimit: 200 }
+              )
+            : null
+
+    const finalsPagination =
+        query?.finalsPage != null || query?.finalsLimit != null
+            ? parsePagination(
+                  {
+                      page: query?.finalsPage,
+                      limit: query?.finalsLimit,
+                  },
+                  { defaultLimit: 100, maxLimit: 200 }
+              )
+            : null
+
+    const photosQuery = GalleryPhoto.find(galleryPublicBrowsePhotoFilter(gallery._id))
+        .sort(GALLERY_MEDIA_SORT)
+    if (photosPagination) {
+        photosQuery.skip(photosPagination.skip).limit(photosPagination.limit)
+    }
+
+    const finalsEnabled = gallery.finalDeliveryEnabled !== false
+    let finalsQuery = null
+    if (finalsEnabled) {
+        finalsQuery = GalleryFinal.find({
+            gallery: gallery._id,
+            deletedAt: null,
+        }).sort(GALLERY_MEDIA_SORT)
+        if (finalsPagination) {
+            finalsQuery.skip(finalsPagination.skip).limit(finalsPagination.limit)
+        }
+    }
+
+    const [photos, selected, finals, setRows, photosTotal, finalsTotal] =
+        await Promise.all([
+            photosQuery.exec(),
+            GalleryPhoto.find(galleryClientSelectionPhotoFilter(gallery._id))
+                .sort(galleryClientSelectionPhotoSort)
+                .exec(),
+            finalsQuery ? finalsQuery.exec() : Promise.resolve([]),
+            GallerySet.find({ gallery: gallery._id })
+                .sort({ sortOrder: 1, createdAt: 1 })
+                .exec(),
+            photosPagination
+                ? GalleryPhoto.countDocuments(
+                      galleryPublicBrowsePhotoFilter(gallery._id)
+                  )
+                : Promise.resolve(null),
+            finalsPagination && finalsEnabled
+                ? GalleryFinal.countDocuments({
+                      gallery: gallery._id,
+                      deletedAt: null,
+                  })
+                : Promise.resolve(null),
+        ])
 
     const flaggedFinals = finals.filter((f) => f.flaggedByClient)
 
@@ -176,9 +227,9 @@ async function buildPublicGalleryPayload(hit) {
         flaggedFinals: flaggedFinals.map(formatFinal),
         counts: {
             sets: sets.length,
-            uploads: photos.length,
+            uploads: photosPagination ? photosTotal : photos.length,
             selected: selected.length,
-            finals: finals.length,
+            finals: finalsPagination ? finalsTotal : finals.length,
             flaggedFinals: flaggedFinals.length,
             selectionLimit: gallery.maxSelections ?? null,
             selectionsRemaining:
@@ -186,6 +237,22 @@ async function buildPublicGalleryPayload(hit) {
                     ? Math.max(0, gallery.maxSelections - selected.length)
                     : null,
         },
+        ...(photosPagination
+            ? {
+                  photosPagination: buildPaginationMeta({
+                      ...photosPagination,
+                      total: photosTotal,
+                  }),
+              }
+            : {}),
+        ...(finalsPagination
+            ? {
+                  finalsPagination: buildPaginationMeta({
+                      ...finalsPagination,
+                      total: finalsTotal,
+                  }),
+              }
+            : {}),
     }
 }
 
@@ -264,7 +331,7 @@ async function respondWithPublicGallery(hit, req, res) {
         const payload = await buildPublicGalleryMetaPayload(hit)
         return res.status(200).json(payload)
     }
-    const payload = await buildPublicGalleryPayload(hit)
+    const payload = await buildPublicGalleryPayload(hit, { query: req.query })
     recordGalleryAnalyticsEvent(hit.gallery._id, "link_view")
     return res.status(200).json(payload)
 }
@@ -307,7 +374,7 @@ export const unlockPublicGallery = async (req, res) => {
 
         if (!galleryRequiresPassword(gallery)) {
             const payload = hasGalleryEmailAccess(req, gallery)
-                ? await buildPublicGalleryPayload(hit)
+                ? await buildPublicGalleryPayload(hit, { query: req.query })
                 : await buildPublicGalleryMetaPayload(hit)
             return res.status(200).json({
                 ...payload,
@@ -344,7 +411,7 @@ export const unlockPublicGallery = async (req, res) => {
             })
         }
 
-        const payload = await buildPublicGalleryPayload(hit)
+        const payload = await buildPublicGalleryPayload(hit, { query: req.query })
         recordGalleryAnalyticsEvent(gallery._id, "link_view")
         return res.status(200).json({
             ...payload,
@@ -622,6 +689,8 @@ async function submitSelectionsForGallery(gallery, req, res) {
             selectionCount: selected.length,
         })
     )
+
+    await publishOwnerChange(gallery.owner)
 
     return res.status(200).json({
         message: "Selections submitted",

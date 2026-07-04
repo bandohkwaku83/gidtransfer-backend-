@@ -6,6 +6,22 @@ import {
     emailVerificationExempt,
     isEmailVerified,
 } from "../utils/emailVerification.js"
+import { cacheGetOrSet } from "../utils/memoryCache.js"
+
+const AUTH_CACHE_TTL_MS = Number(process.env.AUTH_CACHE_TTL_MS ?? 60_000)
+
+const loadActiveUser = async (userId, tokenVersion) => {
+    const cacheKey = `auth:user:${userId}:${tokenVersion}`
+    return cacheGetOrSet(
+        cacheKey,
+        async () => {
+            const user = await User.findById(userId).lean()
+            if (!user || !user.isActive) return null
+            return user
+        },
+        AUTH_CACHE_TTL_MS
+    )
+}
 
 const bearerToken = (authHeader) => {
     if (!authHeader || !authHeader.startsWith("Bearer ")) return null
@@ -51,8 +67,9 @@ export const protectUser = async (req, res, next) => {
             return res.status(401).json({ message: "Not authorized, token invalid" })
         }
 
-        const user = await User.findById(userId)
-        if (!user || !user.isActive) {
+        const tokenVersion = Number(decoded?.tv ?? 0)
+        const user = await loadActiveUser(userId, tokenVersion)
+        if (!user) {
             return res.status(401).json({ message: "Account no longer exists" })
         }
 
@@ -69,7 +86,7 @@ export const protectUser = async (req, res, next) => {
             })
         }
 
-        req.user = user
+        req.user = User.hydrate(user)
         next()
     } catch (err) {
         console.error("[auth] protectUser error:", err)

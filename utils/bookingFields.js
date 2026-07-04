@@ -270,6 +270,22 @@ export const formatBookingResponse = (booking) => {
     }
 }
 
+export const formatBookingSummary = (booking) => {
+    const full = formatBookingResponse(booking)
+    return {
+        _id: full._id,
+        title: full.title,
+        category: full.category,
+        shootType: full.shootType,
+        color: full.color,
+        startsAt: full.startsAt,
+        client: full.client
+            ? { id: full.client._id, name: full.client.name }
+            : null,
+        updatedAt: full.updatedAt,
+    }
+}
+
 export const weekRangeLocal = (reference = new Date()) => {
     const now = new Date(reference)
     const day = now.getDay()
