@@ -113,7 +113,7 @@ if (
     app.set("trust proxy", true)
 }
 
-app.use(requestTiming())
+app.use(requestTiming)
 app.use(
     compression({
         threshold: Number(process.env.COMPRESSION_THRESHOLD_BYTES ?? 1024),
