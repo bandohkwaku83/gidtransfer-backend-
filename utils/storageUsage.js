@@ -13,22 +13,24 @@ const emptyGalleryUsage = () => ({
     totalBytes: 0,
 })
 
-export const getOwnerStorageBreakdown = async (ownerId) => {
-    const galleries = await Gallery.find({
-        ...galleryOwnerFilter(ownerId),
-        ...galleryNotDeletedFilter(),
-    })
-        .select("_id")
-        .lean()
-
-    const galleryIds = galleries.map((g) => g._id)
+export const getOwnerStorageBreakdown = async (ownerId, galleryIds = null) => {
+    const ids =
+        galleryIds ??
+        (
+            await Gallery.find({
+                ...galleryOwnerFilter(ownerId),
+                ...galleryNotDeletedFilter(),
+            })
+                .select("_id")
+                .lean()
+        ).map((g) => g._id)
 
     const [photoRawAgg, photoSelectionAgg, finalAgg] = await Promise.all([
-        galleryIds.length
+        ids.length
             ? GalleryPhoto.aggregate([
                   {
                       $match: {
-                          gallery: { $in: galleryIds },
+                          gallery: { $in: ids },
                           deletedAt: null,
                           selectedByClient: { $ne: true },
                       },
@@ -41,11 +43,11 @@ export const getOwnerStorageBreakdown = async (ownerId) => {
                   },
               ])
             : [],
-        galleryIds.length
+        ids.length
             ? GalleryPhoto.aggregate([
                   {
                       $match: {
-                          gallery: { $in: galleryIds },
+                          gallery: { $in: ids },
                           selectedByClient: true,
                       },
                   },
@@ -57,11 +59,11 @@ export const getOwnerStorageBreakdown = async (ownerId) => {
                   },
               ])
             : [],
-        galleryIds.length
+        ids.length
             ? GalleryFinal.aggregate([
                   {
                       $match: {
-                          gallery: { $in: galleryIds },
+                          gallery: { $in: ids },
                           deletedAt: null,
                       },
                   },

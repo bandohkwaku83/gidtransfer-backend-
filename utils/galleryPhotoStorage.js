@@ -67,9 +67,12 @@ export const validateGalleryPhotoMeta = ({ mimeType, sizeBytes }) => {
 export const relativeGalleryPhotoUrl = (galleryId, filename) =>
     `/uploads/gallery-photos/${galleryId}/${filename}`
 
-/** Resolve a photo URL for API responses (same-origin path; served from S3 or disk). */
+/** Resolve a photo URL for API responses (CDN/S3 when configured, else same-origin path). */
 export const galleryPhotoPublicUrl = (galleryId, storedFilename) => {
     if (!storedFilename) return null
+    if (s3Configured()) {
+        return publicObjectUrl(galleryPhotoObjectKey(galleryId, storedFilename))
+    }
     return relativeGalleryPhotoUrl(galleryId, storedFilename)
 }
 

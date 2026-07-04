@@ -2,6 +2,7 @@ import mongoose from "mongoose"
 import GalleryPhoto from "../models/GalleryPhoto.js"
 import {
     formatGalleryPhotoResponse,
+    formatGalleryPhotoGridResponse,
     loadOwnedGallery,
     resolveGallerySetIdForUpload,
 } from "../utils/galleryDetailHelpers.js"
@@ -35,6 +36,7 @@ import {
     paginatedQuery,
     parsePagination,
 } from "../utils/pagination.js"
+import { isSummaryView } from "../utils/sparseFields.js"
 
 const parseOnConflict = (value) => {
     const s = String(value ?? "skip").trim().toLowerCase()
@@ -164,7 +166,17 @@ export const listGalleryUploads = async (req, res) => {
             filter.deletedAt = null
         }
 
-        const pagination = parsePagination(req.query, { defaultLimit: 200, maxLimit: 500 })
+        const pagination = parsePagination(req.query, {
+            defaultLimit: 50,
+            maxLimit: 500,
+        })
+
+        const gridView =
+            isSummaryView(req.query) ||
+            String(req.query.view ?? "").trim().toLowerCase() === "grid"
+        const formatPhoto = gridView
+            ? formatGalleryPhotoGridResponse
+            : formatGalleryPhotoResponse
 
         const [total, rows] = await Promise.all([
             GalleryPhoto.countDocuments(filter),
@@ -175,8 +187,9 @@ export const listGalleryUploads = async (req, res) => {
         ])
 
         return res.status(200).json({
-            photos: rows.map(formatGalleryPhotoResponse),
+            photos: rows.map((row) => formatPhoto(row)),
             pagination: buildPaginationMeta({ ...pagination, total }),
+            view: gridView ? "grid" : "full",
         })
     } catch (error) {
         console.error("listGalleryUploads:", error)

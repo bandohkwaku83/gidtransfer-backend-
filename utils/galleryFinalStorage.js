@@ -69,6 +69,9 @@ export const relativeGalleryFinalUrl = (galleryId, filename) =>
 
 export const galleryFinalPublicUrl = (galleryId, storedFilename) => {
     if (!storedFilename) return null
+    if (s3Configured()) {
+        return publicObjectUrl(galleryFinalObjectKey(galleryId, storedFilename))
+    }
     return relativeGalleryFinalUrl(galleryId, storedFilename)
 }
 

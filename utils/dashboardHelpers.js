@@ -143,7 +143,7 @@ const mergeDailyCountRows = (rows) =>
         return acc
     }, new Map())
 
-export const buildOwnerActivitySeries = async (ownerId, dayCount = ACTIVITY_DAY_COUNT) => {
+export const loadOwnerGalleryIds = async (ownerId) => {
     const galleries = await Gallery.find({
         ...galleryOwnerFilter(ownerId),
         ...galleryNotDeletedFilter(),
@@ -151,7 +151,15 @@ export const buildOwnerActivitySeries = async (ownerId, dayCount = ACTIVITY_DAY_
         .select("_id")
         .lean()
 
-    const galleryIds = galleries.map((g) => g._id)
+    return galleries.map((g) => g._id)
+}
+
+export const buildOwnerActivitySeries = async (
+    ownerId,
+    dayCount = ACTIVITY_DAY_COUNT,
+    galleryIds = null
+) => {
+    const ids = galleryIds ?? (await loadOwnerGalleryIds(ownerId))
     const rangeStart = startOfDay(new Date())
     rangeStart.setDate(rangeStart.getDate() - (dayCount - 1))
 
@@ -164,14 +172,14 @@ export const buildOwnerActivitySeries = async (ownerId, dayCount = ACTIVITY_DAY_
     ] = await Promise.all([
         aggregateOwnerDailyCounts(
             GalleryPhoto,
-            galleryIds,
+            ids,
             "selectedAt",
             rangeStart,
             { selectedByClient: true }
         ),
-        aggregateOwnerDailyCounts(GalleryPhoto, galleryIds, "createdAt", rangeStart),
-        aggregateOwnerDailyCounts(GalleryFinal, galleryIds, "createdAt", rangeStart),
-        aggregateOwnerTrackedDailyCounts(galleryIds, rangeStart),
+        aggregateOwnerDailyCounts(GalleryPhoto, ids, "createdAt", rangeStart),
+        aggregateOwnerDailyCounts(GalleryFinal, ids, "createdAt", rangeStart),
+        aggregateOwnerTrackedDailyCounts(ids, rangeStart),
         aggregateOwnerGalleryUpdates(ownerId, rangeStart),
     ])
 
@@ -241,15 +249,8 @@ const countActivityInRange = async (ownerId, galleryIds, start, end) => {
     return selections + uploads + finals + events + galleryUpdates
 }
 
-export const buildWeeklyActivityMetrics = async (ownerId) => {
-    const galleries = await Gallery.find({
-        ...galleryOwnerFilter(ownerId),
-        ...galleryNotDeletedFilter(),
-    })
-        .select("_id")
-        .lean()
-
-    const galleryIds = galleries.map((g) => g._id)
+export const buildWeeklyActivityMetrics = async (ownerId, galleryIds = null) => {
+    const ids = galleryIds ?? (await loadOwnerGalleryIds(ownerId))
     const now = new Date()
     const todayStart = startOfDay(now)
     const todayEnd = endOfDay(now)
@@ -261,9 +262,9 @@ export const buildWeeklyActivityMetrics = async (ownerId) => {
     prevWeekEnd.setMilliseconds(prevWeekEnd.getMilliseconds() - 1)
 
     const [today, thisWeek, previousWeek] = await Promise.all([
-        countActivityInRange(ownerId, galleryIds, todayStart, todayEnd),
-        countActivityInRange(ownerId, galleryIds, weekStart, weekEnd),
-        countActivityInRange(ownerId, galleryIds, prevWeekStart, prevWeekEnd),
+        countActivityInRange(ownerId, ids, todayStart, todayEnd),
+        countActivityInRange(ownerId, ids, weekStart, weekEnd),
+        countActivityInRange(ownerId, ids, prevWeekStart, prevWeekEnd),
     ])
 
     const trend = thisWeek - previousWeek

@@ -3,6 +3,7 @@ import Gallery from "../models/Gallery.js"
 import GalleryAccessEmail from "../models/GalleryAccessEmail.js"
 import {
     formatGalleryDetailResponse,
+    formatGalleryPatchResponse,
     loadOwnedGallery,
 } from "../utils/galleryDetailHelpers.js"
 import { invalidateGalleryCounts } from "../utils/galleryFields.js"
@@ -105,7 +106,7 @@ export const updateCoverFocalPoint = async (req, res) => {
         await gallery.save()
         await gallery.populate(populateGalleryBasic)
 
-        const detail = await formatGalleryDetailResponse(gallery)
+        const detail = formatGalleryPatchResponse(gallery)
         return res.status(200).json({
             message: "Cover focal point updated",
             gallery: detail,
@@ -140,7 +141,7 @@ export const uploadGalleryMusic = async (req, res) => {
         await gallery.save()
         await gallery.populate(populateGalleryBasic)
 
-        const detail = await formatGalleryDetailResponse(gallery)
+        const detail = formatGalleryPatchResponse(gallery)
         return res.status(200).json({
             message: "Background music uploaded",
             gallery: detail,
@@ -167,7 +168,7 @@ export const removeGalleryMusic = async (req, res) => {
         await gallery.save()
         await gallery.populate(populateGalleryBasic)
 
-        const detail = await formatGalleryDetailResponse(gallery)
+        const detail = formatGalleryPatchResponse(gallery)
         return res.status(200).json({
             message: "Background music removed",
             gallery: detail,
@@ -210,7 +211,7 @@ export const updateGalleryMusicSettings = async (req, res) => {
         await gallery.save()
         await gallery.populate(populateGalleryBasic)
 
-        const detail = await formatGalleryDetailResponse(gallery)
+        const detail = formatGalleryPatchResponse(gallery)
         return res.status(200).json({
             message: "Background music settings updated",
             gallery: detail,
@@ -278,7 +279,7 @@ export const updateSelectionSettings = async (req, res) => {
         await gallery.save()
         await gallery.populate(populateGalleryBasic)
 
-        const detail = await formatGalleryDetailResponse(gallery)
+        const detail = formatGalleryPatchResponse(gallery)
         return res.status(200).json({
             message: "Selection settings updated",
             gallery: detail,
@@ -312,7 +313,7 @@ export const updateGalleryUploadSettings = async (req, res) => {
         await gallery.save()
         await gallery.populate(populateGalleryBasic)
 
-        const detail = await formatGalleryDetailResponse(gallery)
+        const detail = formatGalleryPatchResponse(gallery)
         return res.status(200).json({
             message: "Upload settings updated",
             gallery: detail,
@@ -346,7 +347,7 @@ export const updateGalleryDesignSettings = async (req, res) => {
         await gallery.save()
         await gallery.populate(populateGalleryBasic)
 
-        const detail = await formatGalleryDetailResponse(gallery)
+        const detail = formatGalleryPatchResponse(gallery)
         return res.status(200).json({
             message: "Gallery design updated",
             gallery: detail,
@@ -445,7 +446,7 @@ export const updateGalleryClientAccess = async (req, res) => {
         await gallery.save()
         await gallery.populate(populateGalleryBasic)
 
-        const detail = await formatGalleryDetailResponse(gallery)
+        const detail = formatGalleryPatchResponse(gallery)
         return res.status(200).json({
             message: "Client access settings updated",
             gallery: detail,
@@ -482,7 +483,7 @@ export const updateGalleryFinalSettings = async (req, res) => {
         await gallery.save()
         await gallery.populate(populateGalleryBasic)
 
-        const detail = await formatGalleryDetailResponse(gallery)
+        const detail = formatGalleryPatchResponse(gallery)
         return res.status(200).json({
             message: "Final delivery settings updated",
             gallery: detail,

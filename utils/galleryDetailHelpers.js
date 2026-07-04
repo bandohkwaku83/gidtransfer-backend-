@@ -68,17 +68,9 @@ export async function resolveShareContext(gallery) {
     }
 }
 
-export const formatGalleryDetailResponse = async (galleryDoc) => {
-    const base = formatGalleryResponse(galleryDoc)
-    const stats = await attachGalleryStats(galleryDoc._id ?? galleryDoc.id)
-    const share = await resolveShareContext(galleryDoc)
+const formatGalleryDetailFields = (galleryDoc) => {
     const plain = galleryDoc.toObject?.() ?? galleryDoc
-
     return {
-        ...base,
-        slug: share.gallerySlug ?? plain.slug ?? null,
-        companySlug: share.companySlug,
-        shareUrl: share.shareUrl,
         coverFocalX: plain.coverFocalX ?? 50,
         coverFocalY: plain.coverFocalY ?? 50,
         shareUseDefaultCover: plain.shareUseDefaultCover ?? null,
@@ -102,6 +94,32 @@ export const formatGalleryDetailResponse = async (galleryDoc) => {
         watermarkPreviewEnabled: plain.watermarkPreviewEnabled === true,
         watermarkFinalsEnabled: plain.watermarkFinalsEnabled === true,
         ...formatGallerySetsSettingsResponse(plain),
+    }
+}
+
+/** Fast gallery payload for PATCH/settings endpoints (no stats or share URL rebuild). */
+export const formatGalleryPatchResponse = (galleryDoc) => {
+    const base = formatGalleryResponse(galleryDoc)
+    const plain = galleryDoc.toObject?.() ?? galleryDoc
+    return {
+        ...base,
+        slug: plain.slug ?? null,
+        ...formatGalleryDetailFields(galleryDoc),
+    }
+}
+
+export const formatGalleryDetailResponse = async (galleryDoc) => {
+    const base = formatGalleryResponse(galleryDoc)
+    const stats = await attachGalleryStats(galleryDoc._id ?? galleryDoc.id)
+    const share = await resolveShareContext(galleryDoc)
+    const plain = galleryDoc.toObject?.() ?? galleryDoc
+
+    return {
+        ...base,
+        slug: share.gallerySlug ?? plain.slug ?? null,
+        companySlug: share.companySlug,
+        shareUrl: share.shareUrl,
+        ...formatGalleryDetailFields(galleryDoc),
         stats,
     }
 }
@@ -231,6 +249,25 @@ export const formatGalleryPhotoResponse = (
         watermarkPreviewEnabled && displayUrl ? displayUrl : url
 
     return response
+}
+
+/** Grid/list tile payload — omits feedback, selection metadata, and full-resolution URLs. */
+export const formatGalleryPhotoGridResponse = (
+    doc,
+    options = {}
+) => {
+    const full = formatGalleryPhotoResponse(doc, options)
+    return {
+        id: full.id,
+        galleryId: full.galleryId,
+        originalFilename: full.originalFilename,
+        thumbUrl: full.thumbUrl,
+        gridUrl: full.gridUrl,
+        sortOrder: full.sortOrder,
+        setId: full.setId,
+        isVideo: full.isVideo,
+        derivativesReady: full.derivativesReady,
+    }
 }
 
 /** Client gallery — keep selected picks visible after raw upload trash. */

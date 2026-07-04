@@ -11,7 +11,7 @@ import {
     normalizeShootCategory,
     shootTypeLabel,
 } from "./bookingShootTypes.js"
-import { cacheDelete, cacheGetOrSet } from "./memoryCache.js"
+import { cacheDelete, cacheDeletePrefix, cacheGetOrSet } from "./memoryCache.js"
 
 const GALLERY_COUNTS_CACHE_TTL_MS = Number(process.env.GALLERY_COUNTS_CACHE_TTL_MS ?? 30_000)
 
@@ -19,6 +19,7 @@ export const galleryCountsCacheKey = (ownerId) => `gallery-counts:${ownerId}`
 
 export const invalidateGalleryCounts = (ownerId) => {
     cacheDelete(galleryCountsCacheKey(ownerId))
+    cacheDeletePrefix(`dashboard:${ownerId}:`)
     import("./syncRevision.js")
         .then(({ publishOwnerChange }) => publishOwnerChange(ownerId))
         .catch(() => {})
