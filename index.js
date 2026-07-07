@@ -38,7 +38,7 @@ import { openAiConfigured } from "./utils/galleryAiDescription.js"
 import { arkeselConfigured } from "./services/arkeselSms.js"
 import { resendConfigured } from "./services/resendEmail.js"
 import { paystackConfigured } from "./services/paystack.js"
-import { s3Configured } from "./utils/s3Storage.js"
+import { s3Configured, s3PublicReadsViaDirectUrl } from "./utils/s3Storage.js"
 import { createS3UploadsMiddleware } from "./utils/s3UploadsMiddleware.js"
 import { startBookingReminderScheduler } from "./jobs/bookingReminderJob.js"
 
@@ -95,9 +95,16 @@ if (paystackConfigured()) {
 }
 
 if (s3Configured()) {
-    console.log(
-        `Object storage (S3): enabled — bucket ${process.env.S3_BUCKET?.trim()}`
-    )
+    const bucket = process.env.S3_BUCKET?.trim()
+    if (s3PublicReadsViaDirectUrl()) {
+        console.log(
+            `Object storage (S3): enabled — bucket ${bucket}, public reads via ${process.env.S3_PUBLIC_URL?.trim()}`
+        )
+    } else {
+        console.log(
+            `Object storage (S3): enabled — bucket ${bucket}, gallery media served via GET /uploads/… (set S3_PUBLIC_URL for a CDN)`
+        )
+    }
 } else {
     console.warn(
         "Object storage (S3): disabled — gallery uploads use local disk. Set S3_BUCKET, AWS_REGION, and AWS credentials for direct-to-S3 uploads."

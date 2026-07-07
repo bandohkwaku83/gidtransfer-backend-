@@ -56,6 +56,13 @@ export const getS3Client = () => {
 
 export const s3Bucket = () => process.env.S3_BUCKET?.trim() ?? ""
 
+/**
+ * True when gallery media should use direct HTTPS URLs (CloudFront / custom CDN).
+ * Without this, clients should load files via GET /uploads/… on the API (s3UploadsMiddleware).
+ */
+export const s3PublicReadsViaDirectUrl = () =>
+    Boolean(process.env.S3_PUBLIC_URL?.trim())
+
 /** Build a stable S3 object key from path segments. */
 export const objectKey = (...parts) =>
     parts

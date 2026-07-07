@@ -13,6 +13,7 @@ import {
 } from "./galleryMediaTypes.js"
 import {
     s3Configured,
+    s3PublicReadsViaDirectUrl,
     objectKey,
     publicObjectUrl,
     createPresignedPutUrl,
@@ -67,13 +68,14 @@ export const validateGalleryPhotoMeta = ({ mimeType, sizeBytes }) => {
 export const relativeGalleryPhotoUrl = (galleryId, filename) =>
     `/uploads/gallery-photos/${galleryId}/${filename}`
 
-/** Resolve a photo URL for API responses (CDN/S3 when configured, else same-origin path). */
+/** Resolve a photo URL for API responses (CDN when configured, else API /uploads proxy or local disk). */
 export const galleryPhotoPublicUrl = (galleryId, storedFilename) => {
     if (!storedFilename) return null
-    if (s3Configured()) {
+    const relative = relativeGalleryPhotoUrl(galleryId, storedFilename)
+    if (s3Configured() && s3PublicReadsViaDirectUrl()) {
         return publicObjectUrl(galleryPhotoObjectKey(galleryId, storedFilename))
     }
-    return relativeGalleryPhotoUrl(galleryId, storedFilename)
+    return relative
 }
 
 export const deleteGalleryPhotoFile = (galleryId, storedFilename) => {
@@ -149,6 +151,7 @@ export const createGalleryPhotoPresignedUpload = async ({
         storedFilename,
         key,
         ...presigned,
+        publicUrl: galleryPhotoPublicUrl(galleryId, storedFilename),
         isVideo: isGalleryVideoMime(mimeType),
     }
 }

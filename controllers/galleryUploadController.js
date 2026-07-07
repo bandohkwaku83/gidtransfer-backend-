@@ -174,9 +174,10 @@ export const listGalleryUploads = async (req, res) => {
         const gridView =
             isSummaryView(req.query) ||
             String(req.query.view ?? "").trim().toLowerCase() === "grid"
+        const photoOptions = { absoluteUrls: true }
         const formatPhoto = gridView
-            ? formatGalleryPhotoGridResponse
-            : formatGalleryPhotoResponse
+            ? (row) => formatGalleryPhotoGridResponse(row, photoOptions)
+            : (row) => formatGalleryPhotoResponse(row, photoOptions)
 
         const [total, rows] = await Promise.all([
             GalleryPhoto.countDocuments(filter),
@@ -386,6 +387,7 @@ export const completeGalleryPhotoUploads = async (req, res) => {
                 })
                 replaced.push(
                     formatGalleryPhotoResponse(row, {
+                        absoluteUrls: true,
                         watermarkPreviewEnabled: applyPreviewWatermark,
                     })
                 )
@@ -404,6 +406,7 @@ export const completeGalleryPhotoUploads = async (req, res) => {
                 nextSortOrder += 1
                 created.push(
                     formatGalleryPhotoResponse(row, {
+                        absoluteUrls: true,
                         watermarkPreviewEnabled: applyPreviewWatermark,
                     })
                 )
@@ -528,6 +531,7 @@ export const uploadGalleryPhotos = async (req, res) => {
                 })
                 replaced.push(
                     formatGalleryPhotoResponse(row, {
+                        absoluteUrls: true,
                         watermarkPreviewEnabled: applyPreviewWatermark,
                     })
                 )
@@ -545,6 +549,7 @@ export const uploadGalleryPhotos = async (req, res) => {
                 nextSortOrder += 1
                 created.push(
                     formatGalleryPhotoResponse(row, {
+                        absoluteUrls: true,
                         watermarkPreviewEnabled: applyPreviewWatermark,
                     })
                 )

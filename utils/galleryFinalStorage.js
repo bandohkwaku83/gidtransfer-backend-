@@ -13,6 +13,7 @@ import {
 } from "./galleryMediaTypes.js"
 import {
     s3Configured,
+    s3PublicReadsViaDirectUrl,
     objectKey,
     publicObjectUrl,
     createPresignedPutUrl,
@@ -69,10 +70,11 @@ export const relativeGalleryFinalUrl = (galleryId, filename) =>
 
 export const galleryFinalPublicUrl = (galleryId, storedFilename) => {
     if (!storedFilename) return null
-    if (s3Configured()) {
+    const relative = relativeGalleryFinalUrl(galleryId, storedFilename)
+    if (s3Configured() && s3PublicReadsViaDirectUrl()) {
         return publicObjectUrl(galleryFinalObjectKey(galleryId, storedFilename))
     }
-    return relativeGalleryFinalUrl(galleryId, storedFilename)
+    return relative
 }
 
 export const deleteGalleryFinalFile = (galleryId, storedFilename) => {
@@ -140,6 +142,7 @@ export const createGalleryFinalPresignedUpload = async ({
         storedFilename,
         key,
         ...presigned,
+        publicUrl: galleryFinalPublicUrl(galleryId, storedFilename),
         isVideo: isGalleryVideoMime(mimeType),
     }
 }
