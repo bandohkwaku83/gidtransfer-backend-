@@ -1,6 +1,6 @@
 import GalleryPhoto from "../models/GalleryPhoto.js"
 import { isGalleryImageMime } from "./galleryMediaTypes.js"
-import { generateGalleryPhotoDerivatives } from "./previewWatermark.js"
+import { generateGalleryPhotoDerivatives, galleryThumbMaxPx } from "./previewWatermark.js"
 
 const MAX_CONCURRENT = Math.max(
     1,
@@ -14,7 +14,8 @@ let active = 0
 export const photoDerivativesReady = (photo) => {
     if (photo?.isVideo === true) return true
     if (!isGalleryImageMime(photo?.mimeType)) return true
-    return Boolean(photo?.thumbStoredFilename)
+    if (galleryThumbMaxPx() > 0 && !photo?.thumbStoredFilename) return false
+    return true
 }
 
 const processJob = async (job) => {

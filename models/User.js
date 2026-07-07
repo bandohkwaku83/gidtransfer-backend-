@@ -260,6 +260,21 @@ const userSchema = new mongoose.Schema(
         onboardingCompletedAt: {
             type: Date,
         },
+        lastLoginAt: {
+            type: Date,
+            default: null,
+            index: true,
+        },
+        lastSeenAt: {
+            type: Date,
+            default: null,
+            index: true,
+        },
+        loginCount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
         /** Public account reference, e.g. gt1001 */
         accountId: {
             type: String,

@@ -242,16 +242,16 @@ export const formatGalleryPhotoResponse = (
     if (thumbUrl) response.thumbUrl = thumbUrl
     if (displayUrl) response.displayUrl = displayUrl
 
-    // gridUrl: mosaic / list tiles (smaller derivative when ready)
-    response.gridUrl = thumbUrl ?? url
-    // viewUrl: lightbox / fullscreen — full resolution; watermarked for client preview when enabled
+    // gridUrl / viewUrl always point at full-resolution originals unless a
+    // watermarked client preview is explicitly enabled for viewUrl.
+    response.gridUrl = url
     response.viewUrl =
         watermarkPreviewEnabled && displayUrl ? displayUrl : url
 
     return response
 }
 
-/** Grid/list tile payload — omits feedback, selection metadata, and full-resolution URLs. */
+/** Grid/list tile payload — full-resolution URLs; thumbUrl remains optional when generated. */
 export const formatGalleryPhotoGridResponse = (
     doc,
     options = {}
@@ -261,8 +261,10 @@ export const formatGalleryPhotoGridResponse = (
         id: full.id,
         galleryId: full.galleryId,
         originalFilename: full.originalFilename,
+        url: full.url,
         thumbUrl: full.thumbUrl,
         gridUrl: full.gridUrl,
+        viewUrl: full.viewUrl,
         sortOrder: full.sortOrder,
         setId: full.setId,
         isVideo: full.isVideo,

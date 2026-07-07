@@ -126,6 +126,8 @@ app.use(
         threshold: Number(process.env.COMPRESSION_THRESHOLD_BYTES ?? 1024),
         filter: (req, res) => {
             if (req.headers["x-no-compression"]) return false
+            const pathname = (req.originalUrl || req.url || "").split("?")[0]
+            if (pathname.startsWith("/uploads/")) return false
             return compression.filter(req, res)
         },
     })
@@ -210,18 +212,39 @@ app.get("/api", (_req, res) => {
             admin: {
                 login: "POST /api/admin/auth/login",
                 me: "GET /api/admin/auth/me",
+                stats: "GET /api/admin/stats",
+                photographers: {
+                    list:
+                        "GET /api/admin/photographers?onboarded=&emailVerified=&planId=&subscriptionStatus=&smsSenderStatus=&isActive=&search=&sort=lastLoginAt&page=&limit=",
+                    get: "GET /api/admin/photographers/:userId?sessionLimit=10",
+                    sessions:
+                        "GET /api/admin/photographers/:userId/sessions?active=true&page=&limit=",
+                    update:
+                        "PATCH /api/admin/photographers/:userId (JSON: isActive)",
+                    verifyEmail:
+                        "POST /api/admin/photographers/:userId/verify-email",
+                },
+                issueReports: {
+                    list: "GET /api/admin/issue-reports?status=open|resolved|all&topic=&search=",
+                    update:
+                        "PATCH /api/admin/issue-reports/:id (JSON: status open|resolved)",
+                },
+                communications: {
+                    config: "GET /api/admin/communications/config",
+                    list: "GET /api/admin/communications?channel=sms|email&userId=",
+                    sendSms:
+                        "POST /api/admin/communications/sms (JSON: userIds|userId|filter, message)",
+                    sendEmail:
+                        "POST /api/admin/communications/email (JSON: userIds|userId|filter, subject, message)",
+                    photographer:
+                        "POST /api/admin/photographers/:userId/communicate (JSON: channels sms|email|both, subject, message)",
+                },
                 listSenderIds:
                     "GET /api/admin/sms/sender-ids?status=pending|approved|rejected|all",
                 approveSenderId:
                     "PATCH /api/admin/sms/sender-ids/:userId/approve",
                 rejectSenderId:
                     "PATCH /api/admin/sms/sender-ids/:userId/reject (JSON: reason)",
-                emailLogo: {
-                    get: "GET /api/admin/email/logo",
-                    upload:
-                        "POST /api/admin/email/logo (multipart field: logo — PNG/JPG)",
-                    delete: "DELETE /api/admin/email/logo",
-                },
             },
             settings: {
                 get: "GET /api/settings",

@@ -792,7 +792,7 @@
     },
     {
       "name": "Admin",
-      "description": "Platform admin JWT (`adminToken`). Run **Admin login** first, then approve studio SMS sender IDs.",
+      "description": "Platform admin JWT (`adminToken`). Run **Admin login** first.",
       "item": [
         {
           "name": "Admin login",
@@ -822,9 +822,138 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"your-admin-password\"\n}"
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"123456\"\n}"
             },
             "url": "{{baseUrl}}/api/admin/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "Admin stats",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/stats"
+          },
+          "response": []
+        },
+        {
+          "name": "List photographers",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/photographers?onboarded=true&sort=lastLoginAt&order=desc"
+          },
+          "response": []
+        },
+        {
+          "name": "Get photographer",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/photographers/{{userId}}?sessionLimit=10"
+          },
+          "response": []
+        },
+        {
+          "name": "List photographer sessions",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/sessions"
+          },
+          "response": []
+        },
+        {
+          "name": "Communication config",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/communications/config"
+          },
+          "response": []
+        },
+        {
+          "name": "Send SMS to photographers",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userIds\": [\"{{userId}}\"],\n  \"message\": \"Hello from Gidtransfer admin. This is a platform update.\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/communications/sms"
+          },
+          "response": []
+        },
+        {
+          "name": "Send email to photographers",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userIds\": [\"{{userId}}\"],\n  \"subject\": \"Important platform update\",\n  \"message\": \"Hi there,\\n\\nWe wanted to share an important update with your studio.\\n\\nThanks for being on Gidtransfer.\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/communications/email"
+          },
+          "response": []
+        },
+        {
+          "name": "Communicate with one photographer",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channels\": [\"email\", \"sms\"],\n  \"subject\": \"Quick note from support\",\n  \"message\": \"Thanks for reaching out. Your account is all set.\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/communicate"
+          },
+          "response": []
+        },
+        {
+          "name": "List communication history",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/communications"
           },
           "response": []
         },
@@ -851,43 +980,6 @@
             "method": "PATCH",
             "header": [],
             "url": "{{baseUrl}}/api/admin/sms/sender-ids/{{userId}}/approve"
-          },
-          "response": []
-        },
-        {
-          "name": "Get email logo",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
-            },
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/api/admin/email/logo"
-          },
-          "response": []
-        },
-        {
-          "name": "Upload email logo",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
-            },
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "formdata",
-              "formdata": [
-                {
-                  "key": "logo",
-                  "type": "file",
-                  "src": [],
-                  "description": "PNG or JPG, max 5MB — Gidtransfer logo for all notification emails"
-                }
-              ]
-            },
-            "url": "{{baseUrl}}/api/admin/email/logo"
           },
           "response": []
         }

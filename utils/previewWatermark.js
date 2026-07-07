@@ -14,10 +14,16 @@ import {
     deleteObject,
 } from "./s3Storage.js"
 
-const THUMB_MAX_PX = Math.max(
-    320,
-    Number(process.env.GALLERY_THUMB_MAX_PX) || 1200
-)
+const parseThumbMaxPx = () => {
+    const raw = process.env.GALLERY_THUMB_MAX_PX?.trim()
+    if (raw === undefined || raw === "") return 0
+    const n = Number(raw)
+    if (!Number.isFinite(n) || n <= 0) return 0
+    return Math.max(320, Math.floor(n))
+}
+
+/** Optional grid thumbnails — disabled unless GALLERY_THUMB_MAX_PX is set. Originals are never resized. */
+export const galleryThumbMaxPx = () => parseThumbMaxPx()
 
 const escapeXml = (value) =>
     String(value ?? "")
@@ -159,22 +165,29 @@ export async function generateGalleryPhotoDerivatives({
     const { thumbStoredFilename, previewWmStoredFilename } =
         derivativeNames(storedFilename)
     const thumbMime = mimeForDerivative(thumbStoredFilename)
+    const thumbMaxPx = parseThumbMaxPx()
 
     const meta = await sharp(sourceBuffer, { failOn: "none" }).rotate().metadata()
 
-    const thumbBuffer = await applyOutputFormat(
-        sharp(sourceBuffer, { failOn: "none" })
-            .rotate()
-            .resize({
-                width: THUMB_MAX_PX,
-                height: THUMB_MAX_PX,
-                fit: "inside",
-                withoutEnlargement: true,
-            }),
-        meta
-    ).toBuffer()
+    let thumbResultFilename = null
+    if (thumbMaxPx > 0) {
+        const thumbBuffer = await applyOutputFormat(
+            sharp(sourceBuffer, { failOn: "none" })
+                .rotate()
+                .resize({
+                    width: thumbMaxPx,
+                    height: thumbMaxPx,
+                    fit: "inside",
+                    withoutEnlargement: true,
+                }),
+            meta
+        ).toBuffer()
 
-    await writeDerivative(galleryId, thumbStoredFilename, thumbBuffer, thumbMime)
+        await writeDerivative(galleryId, thumbStoredFilename, thumbBuffer, thumbMime)
+        thumbResultFilename = thumbStoredFilename
+    } else {
+        await removeDerivative(galleryId, thumbStoredFilename)
+    }
 
     if (applyWatermark) {
         const { data, info } = await sharp(sourceBuffer, { failOn: "none" })
@@ -202,7 +215,7 @@ export async function generateGalleryPhotoDerivatives({
     }
 
     return {
-        thumbStoredFilename,
+        thumbStoredFilename: thumbResultFilename,
         previewWmStoredFilename: applyWatermark ? previewWmStoredFilename : null,
     }
 }

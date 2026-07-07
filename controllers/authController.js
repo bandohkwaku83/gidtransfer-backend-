@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken"
 import Admin from "../models/Admin.js"
 import User from "../models/User.js"
 import { generateUserToken } from "../utils/authToken.js"
+import { beginUserSession, endAllUserSessions, issueAuthenticatedSession } from "../utils/userSessions.js"
 import { providerSignInHint } from "../utils/authMessages.js"
 import { nextAccountId } from "../utils/accountId.js"
 import { formatUserResponse } from "../utils/formatUserResponse.js"
@@ -21,12 +22,23 @@ import {
 import { verifyGoogleIdToken } from "../utils/verifyGoogleIdToken.js"
 import { cacheDeletePrefix } from "../utils/memoryCache.js"
 
-const authSuccess = (user, message = "Login successful") => ({
-    message,
-    token: generateUserToken(user),
-    user: formatUserResponse(user),
-    requiresEmailVerification: !formatUserResponse(user).emailVerified,
-})
+const authSuccess = async (
+    user,
+    req,
+    authMethod = "email",
+    message = "Login successful"
+) => {
+    const { token, user: updatedUser } = await issueAuthenticatedSession(user, {
+        req,
+        authMethod,
+    })
+    return {
+        message,
+        token,
+        user: formatUserResponse(updatedUser),
+        requiresEmailVerification: !formatUserResponse(updatedUser).emailVerified,
+    }
+}
 
 const FORGOT_PASSWORD_MESSAGE =
     "If an account exists for that email, password reset instructions have been sent."
@@ -74,12 +86,15 @@ export const register = async (req, res) => {
         const user = await User.create({ ...fields, accountId })
         await issueAndSendEmailVerification(user)
 
-        const token = generateUserToken(user)
+        const { token, user: updatedUser } = await issueAuthenticatedSession(user, {
+            req,
+            authMethod: "register",
+        })
 
         return res.status(201).json({
             message: "Account created successfully",
             token,
-            user: formatUserResponse(user),
+            user: formatUserResponse(updatedUser),
             requiresEmailVerification: true,
         })
     } catch (error) {
@@ -125,9 +140,12 @@ export const login = async (req, res) => {
             return res.status(401).json({ message: "Invalid credentials" })
         }
 
-        return res.status(200).json(authSuccess(user))
+        return res.status(200).json(await authSuccess(user, req, "email"))
     } catch (error) {
         console.error("Login error:", error)
+        if (error.message?.includes("recording login session")) {
+            return res.status(500).json({ message: "Could not start login session" })
+        }
         return res.status(500).json({ message: "Server error" })
     }
 }
@@ -138,6 +156,7 @@ export const me = async (req, res) => {
 
 export const logout = async (req, res) => {
     try {
+        await endAllUserSessions(req.user._id, "logout")
         req.user.tokenVersion = (req.user.tokenVersion ?? 0) + 1
         await req.user.save()
         cacheDeletePrefix(`auth:user:${req.user._id}:`)
@@ -233,7 +252,7 @@ export const resetPassword = async (req, res) => {
         await user.save()
 
         return res.status(200).json(
-            authSuccess(user, "Password updated successfully")
+            await authSuccess(user, req, "password_reset", "Password updated successfully")
         )
     } catch (error) {
         console.error("Reset password error:", error)
@@ -278,11 +297,17 @@ export const googleAuth = async (req, res) => {
         })
 
         if (user) {
-            const token = generateUserToken(user)
+            const { token, user: updatedUser } = await issueAuthenticatedSession(
+                user,
+                {
+                    req,
+                    authMethod: "google",
+                }
+            )
             return res.status(200).json({
                 message: "Login successful",
                 token,
-                user: formatUserResponse(user),
+                user: formatUserResponse(updatedUser),
                 isNewUser: false,
             })
         }
@@ -304,12 +329,15 @@ export const googleAuth = async (req, res) => {
             emailVerifiedAt: new Date(),
         })
 
-        const token = generateUserToken(user)
+        const { token, user: updatedUser } = await issueAuthenticatedSession(user, {
+            req,
+            authMethod: "google",
+        })
 
         return res.status(201).json({
             message: "Account created successfully",
             token,
-            user: formatUserResponse(user),
+            user: formatUserResponse(updatedUser),
             isNewUser: true,
         })
     } catch (error) {
@@ -367,9 +395,20 @@ export const verifyEmail = async (req, res) => {
         user.emailVerificationExpires = undefined
         await user.save()
 
+        let sessionId = null
+        const authHeader = req.headers.authorization
+        if (authHeader?.startsWith("Bearer ")) {
+            try {
+                const decoded = jwt.decode(authHeader.slice(7).trim())
+                sessionId = decoded?.sid ?? null
+            } catch {
+                sessionId = null
+            }
+        }
+
         return res.status(200).json({
             message: "Email verified successfully",
-            token: generateUserToken(user),
+            token: generateUserToken(user, sessionId),
             user: formatUserResponse(user),
             requiresEmailVerification: false,
         })

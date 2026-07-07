@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken"
 
 export const tokenVersionFromUser = (user) => Number(user?.tokenVersion ?? 0)
 
-export const generateUserToken = (user) => {
+export const generateUserToken = (user, sessionId = null) => {
     const secret = process.env.JWT_SECRET
     if (!secret?.trim()) {
         throw new Error("JWT_SECRET is not configured")
@@ -13,15 +13,18 @@ export const generateUserToken = (user) => {
         throw new Error("User id is required to generate a token")
     }
 
-    return jwt.sign(
-        {
-            id: String(id),
-            kind: "user",
-            tv: tokenVersionFromUser(user),
-        },
-        secret,
-        { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
-    )
+    const payload = {
+        id: String(id),
+        kind: "user",
+        tv: tokenVersionFromUser(user),
+    }
+    if (sessionId) {
+        payload.sid = String(sessionId)
+    }
+
+    return jwt.sign(payload, secret, {
+        expiresIn: process.env.JWT_EXPIRES_IN || "7d",
+    })
 }
 
 /** False when the JWT was issued before the user's last logout. */

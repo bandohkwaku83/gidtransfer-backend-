@@ -6,6 +6,7 @@ import {
     emailVerificationExempt,
     isEmailVerified,
 } from "../utils/emailVerification.js"
+import { touchUserActivity } from "../utils/userSessions.js"
 import { cacheGetOrSet } from "../utils/memoryCache.js"
 
 const AUTH_CACHE_TTL_MS = Number(process.env.AUTH_CACHE_TTL_MS ?? 60_000)
@@ -85,6 +86,8 @@ export const protectUser = async (req, res, next) => {
                 code: "EMAIL_NOT_VERIFIED",
             })
         }
+
+        touchUserActivity(userId, decoded.sid ?? null).catch(() => {})
 
         req.user = User.hydrate(user)
         next()

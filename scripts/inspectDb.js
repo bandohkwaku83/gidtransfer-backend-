@@ -11,6 +11,8 @@ import Booking from "../models/Booking.js"
 import Counter from "../models/Counter.js"
 import Admin from "../models/Admin.js"
 import IssueReport from "../models/IssueReport.js"
+import AdminCommunication from "../models/AdminCommunication.js"
+import UserSession from "../models/UserSession.js"
 
 dotenv.config()
 
@@ -26,6 +28,8 @@ const EXPECTED = {
     counters: Counter,
     admins: Admin,
     issuereports: IssueReport,
+    usersessions: UserSession,
+    admincommunications: AdminCommunication,
 }
 
 async function main() {

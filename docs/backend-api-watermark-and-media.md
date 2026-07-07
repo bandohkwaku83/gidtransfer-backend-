@@ -12,13 +12,13 @@ This document describes how **watermarked previews**, **`displayUrl`**, and rela
 | **`watermarkPreviewEnabled`** | `Gallery` | Per-gallery override. Toggle via `PATCH /api/galleries/:id/upload-settings`. |
 | **`WATERMARK_PREVIEW_TEXT`** | Server env | Optional default text composited onto preview images. Falls back to the studio **company name**, then `"Preview"`. |
 
-Raw originals remain unmodified on disk. When preview watermarking is enabled, the upload pipeline writes companion files beside the original:
+Raw originals remain unmodified in storage (direct S3 PUT or local write). When preview watermarking is enabled, the upload pipeline writes companion files beside the original:
 
 | File | Pattern | Purpose |
 |------|---------|---------|
-| Original | `{uuid}.jpg` | Full-quality master (`url`) |
-| Thumbnail | `{uuid}-thumb.jpg` | Grid thumbnail (`thumbUrl`) |
-| Watermarked preview | `{uuid}-preview-wm.jpg` | Client full-screen preview (`displayUrl`) |
+| Original | `{uuid}.jpg` | Full-quality master (`url`, `gridUrl`, `viewUrl` for photographers) |
+| Thumbnail (optional) | `{uuid}-thumb.jpg` | Only when `GALLERY_THUMB_MAX_PX` is set — optional `thumbUrl` |
+| Watermarked preview | `{uuid}-preview-wm.jpg` | Client full-screen preview (`displayUrl`) at full resolution |
 
 ---
 

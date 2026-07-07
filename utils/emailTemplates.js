@@ -461,3 +461,34 @@ export const testNotificationEmail = ({ studioName }) => {
         text: `Hi ${studioName || "there"}, your ${brandName()} email notifications are working.`,
     }
 }
+
+export const adminPlatformMessageEmail = ({ recipientName, subject, message }) => {
+    const paragraphs = String(message ?? "")
+        .trim()
+        .split(/\n{2,}|\n/)
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .map((part) => bodyParagraph(escapeHtml(part).replace(/\n/g, "<br />")))
+        .join("")
+
+    const bodyHtml = `
+      <p style="margin:0 0 20px;font-family:${FONT};font-size:15px;line-height:1.65;color:${COLORS.body};">
+        Hi <strong style="color:${COLORS.ink};">${escapeHtml(recipientName || "there")}</strong>,
+      </p>
+      ${paragraphs}
+      ${bodyParagraph(`— The ${escapeHtml(brandDisplayName())} team`)}
+    `
+
+    const brand = brandName()
+
+    return {
+        subject: subject.trim(),
+        html: layout({
+            label: "Platform message",
+            title: subject.trim(),
+            subtitle: `A message from ${brandDisplayName()}`,
+            bodyHtml,
+        }),
+        text: `Hi ${recipientName || "there"},\n\n${message}\n\n— The ${brand} team`,
+    }
+}
