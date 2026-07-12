@@ -1,4 +1,7 @@
-import { formatUserResponse } from "./formatUserResponse.js"
+import {
+    formatUserResponse,
+    resolveStudioLogoSrc,
+} from "./formatUserResponse.js"
 import { formatBillingSubscriptionResponse } from "./subscriptionFields.js"
 import { formatBytesLabel } from "./storageFields.js"
 import { getPlanById } from "./planCatalog.js"
@@ -157,12 +160,19 @@ export const formatAdminPhotographerDetail = ({
     recentSessions = [],
 }) => {
     const shaped = formatUserResponse(user)
+    const companyLogo = resolveStudioLogoSrc(user.studio ?? {}) ?? null
     const billing = formatBillingSubscriptionResponse(user)
     const plan = getPlanById(billing.planId) ?? getPlanById("free")
     const storageBytes = storageBreakdown?.totalBytes ?? 0
 
     return {
         ...shaped,
+        companyLogo,
+        studio: shaped.studio
+            ? { ...shaped.studio, companyLogo }
+            : companyLogo
+              ? { companyLogo }
+              : undefined,
         onboardingCompletedAt: user.onboardingCompletedAt ?? null,
         agreedToTermsAt: user.agreedToTermsAt ?? null,
         activity: {

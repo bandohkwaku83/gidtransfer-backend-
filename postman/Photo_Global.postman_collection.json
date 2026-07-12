@@ -203,6 +203,10 @@
     {
       "key": "galleryPassword",
       "value": "gallery-secret"
+    },
+    {
+      "key": "issueReportId",
+      "value": ""
     }
   ],
   "item": [
@@ -881,6 +885,45 @@
           "response": []
         },
         {
+          "name": "Activate photographer",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "PATCH",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/activate"
+          },
+          "response": []
+        },
+        {
+          "name": "Deactivate photographer",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "PATCH",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/deactivate"
+          },
+          "response": []
+        },
+        {
+          "name": "Verify photographer email",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/verify-email"
+          },
+          "response": []
+        },
+        {
           "name": "Communication config",
           "request": {
             "auth": {
@@ -954,6 +997,59 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/admin/communications"
+          },
+          "response": []
+        },
+        {
+          "name": "List issue reports",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.test('issue reports payload', () => {",
+                  "        pm.expect(body.items).to.be.an('array');",
+                  "        pm.expect(body.topics).to.be.an('array').that.is.not.empty;",
+                  "    });",
+                  "    const firstId = body.items[0]?.id;",
+                  "    if (firstId) {",
+                  "        pm.collectionVariables.set('issueReportId', firstId);",
+                  "        if (pm.environment) pm.environment.set('issueReportId', firstId);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/issue-reports?status=open"
+          },
+          "response": []
+        },
+        {
+          "name": "Resolve issue report",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"resolved\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/issue-reports/{{issueReportId}}"
           },
           "response": []
         },
@@ -1450,6 +1546,11 @@
                       "        pm.expect(body.report).to.be.an('object');",
                       "        pm.expect(body.mailto).to.be.undefined;",
                       "    });",
+                      "    const reportId = body.report?.id;",
+                      "    if (reportId) {",
+                      "        pm.collectionVariables.set('issueReportId', reportId);",
+                      "        if (pm.environment) pm.environment.set('issueReportId', reportId);",
+                      "    }",
                       "}"
                     ]
                   }

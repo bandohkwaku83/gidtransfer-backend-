@@ -7,6 +7,8 @@ import {
 } from "../controllers/adminSmsController.js"
 import { getAdminStats } from "../controllers/adminStatsController.js"
 import {
+    activatePhotographer,
+    deactivatePhotographer,
     getPhotographer,
     listPhotographerSessions,
     listPhotographers,
@@ -47,14 +49,26 @@ router.post(
     requireAdmin,
     sendPhotographerCommunication
 )
-router.get("/photographers/:userId", protect, requireAdmin, getPhotographer)
-router.patch("/photographers/:userId", protect, requireAdmin, updatePhotographer)
+router.patch(
+    "/photographers/:userId/activate",
+    protect,
+    requireAdmin,
+    activatePhotographer
+)
+router.patch(
+    "/photographers/:userId/deactivate",
+    protect,
+    requireAdmin,
+    deactivatePhotographer
+)
 router.post(
     "/photographers/:userId/verify-email",
     protect,
     requireAdmin,
     verifyPhotographerEmail
 )
+router.get("/photographers/:userId", protect, requireAdmin, getPhotographer)
+router.patch("/photographers/:userId", protect, requireAdmin, updatePhotographer)
 
 router.get("/issue-reports", protect, requireAdmin, listIssueReports)
 router.patch(

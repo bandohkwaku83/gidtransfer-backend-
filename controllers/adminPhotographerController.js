@@ -36,6 +36,21 @@ const findPhotographer = async (userId) => {
     return { user }
 }
 
+const setPhotographerActiveStatus = async (user, nextActive) => {
+    if (user.isActive === nextActive) {
+        return false
+    }
+
+    user.isActive = nextActive
+    if (!nextActive) {
+        await endAllUserSessions(user._id, "revoked")
+        user.tokenVersion = (user.tokenVersion ?? 0) + 1
+    }
+
+    await user.save()
+    return true
+}
+
 export const listPhotographers = async (req, res) => {
     try {
         const pagination = parsePagination(req.query, {
@@ -179,15 +194,10 @@ export const updatePhotographer = async (req, res) => {
         let changed = false
 
         if (body.isActive !== undefined) {
-            const nextActive = Boolean(body.isActive)
-            if (user.isActive !== nextActive) {
-                user.isActive = nextActive
-                changed = true
-                if (!nextActive) {
-                    await endAllUserSessions(user._id, "revoked")
-                    user.tokenVersion = (user.tokenVersion ?? 0) + 1
-                }
-            }
+            changed = await setPhotographerActiveStatus(
+                user,
+                Boolean(body.isActive)
+            )
         }
 
         if (!changed) {
@@ -196,14 +206,50 @@ export const updatePhotographer = async (req, res) => {
             })
         }
 
-        await user.save()
-
         return res.status(200).json({
             message: "Photographer updated",
             user: formatUserResponse(user),
         })
     } catch (error) {
         console.error("updatePhotographer:", error)
+        return res.status(500).json({ message: "Server error" })
+    }
+}
+
+export const activatePhotographer = async (req, res) => {
+    try {
+        const { user, error } = await findPhotographer(req.params.userId)
+        if (error) {
+            return res.status(error.status).json({ message: error.message })
+        }
+
+        await setPhotographerActiveStatus(user, true)
+
+        return res.status(200).json({
+            message: "Photographer activated",
+            user: formatUserResponse(user),
+        })
+    } catch (error) {
+        console.error("activatePhotographer:", error)
+        return res.status(500).json({ message: "Server error" })
+    }
+}
+
+export const deactivatePhotographer = async (req, res) => {
+    try {
+        const { user, error } = await findPhotographer(req.params.userId)
+        if (error) {
+            return res.status(error.status).json({ message: error.message })
+        }
+
+        await setPhotographerActiveStatus(user, false)
+
+        return res.status(200).json({
+            message: "Photographer deactivated",
+            user: formatUserResponse(user),
+        })
+    } catch (error) {
+        console.error("deactivatePhotographer:", error)
         return res.status(500).json({ message: "Server error" })
     }
 }

@@ -115,7 +115,7 @@ export const formatUserResponse = (user) => {
                   ...(website ? { website } : {}),
                   ...(logoDataUrl ? { logoDataUrl } : {}),
                   ...(logoUrl ? { logoUrl } : {}),
-                  ...(logoSrc ? { logoSrc } : {}),
+                  ...(logoSrc ? { logoSrc, companyLogo: logoSrc } : {}),
               }
             : undefined
 

@@ -210,6 +210,7 @@ app.get("/api", (_req, res) => {
                 test: "POST /api/email/test (JSON: optional to)",
             },
             admin: {
+                note: "Separate admin frontend (e.g. https://admin.gidtransfer.com) — same API, JWT kind=admin",
                 login: "POST /api/admin/auth/login",
                 me: "GET /api/admin/auth/me",
                 stats: "GET /api/admin/stats",
@@ -221,6 +222,9 @@ app.get("/api", (_req, res) => {
                         "GET /api/admin/photographers/:userId/sessions?active=true&page=&limit=",
                     update:
                         "PATCH /api/admin/photographers/:userId (JSON: isActive)",
+                    activate: "PATCH /api/admin/photographers/:userId/activate",
+                    deactivate:
+                        "PATCH /api/admin/photographers/:userId/deactivate",
                     verifyEmail:
                         "POST /api/admin/photographers/:userId/verify-email",
                 },
