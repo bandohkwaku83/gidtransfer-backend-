@@ -5,7 +5,7 @@ Gidtransfer has **two separate frontends** that both talk to **this one backend 
 | Frontend | Domain (production) | Users | API prefix |
 |----------|---------------------|-------|------------|
 | **Main app** | `https://gidtransfer.com` | Photographers / studios | `/api/*` (not `/api/admin`) |
-| **Admin app** | `https://admin.gidtransfer.com` | Platform operators | `/api/admin/*` |
+| **Admin app** | Separate project (e.g. `localhost:3001`) | Platform operators | `/api/admin/*` |
 
 Backend repo: `photo_global_backend`  
 API base (production example): `https://api.gidtransfer.com`
@@ -18,7 +18,7 @@ API base (production example): `https://api.gidtransfer.com`
 flowchart LR
   subgraph frontends [Frontends]
     Main["Main app\ngidtransfer.com"]
-    Admin["Admin app\nadmin.gidtransfer.com"]
+    Admin["Admin app\nseparate project"]
   end
 
   API["Backend API\napi.gidtransfer.com"]
@@ -47,8 +47,8 @@ Copy the frontend examples to `.env.local` in each respective frontend project.
 These are **backend** settings — configure once on the API server, not in either frontend repo.
 
 ```env
-# Both browser origins must be listed in production
-CORS_ORIGINS=https://gidtransfer.com,https://www.gidtransfer.com,https://admin.gidtransfer.com
+# Main app origin(s) in production; add your admin app's origin if deployed separately
+CORS_ORIGINS=https://gidtransfer.com,https://www.gidtransfer.com
 
 API_PUBLIC_URL=https://api.gidtransfer.com
 APP_URL=https://gidtransfer.com
@@ -56,7 +56,7 @@ APP_URL=https://gidtransfer.com
 
 | Variable | Purpose |
 |----------|---------|
-| `CORS_ORIGINS` | Must include **both** frontend origins in production |
+| `CORS_ORIGINS` | Main app origin in production; add admin app origin if it runs on a different host |
 | `API_PUBLIC_URL` | Public HTTPS URL of this API (emails, media URLs) |
 | `APP_URL` | **Main photographer app** only — share links, billing redirect, password reset |
 
@@ -123,7 +123,7 @@ NEXT_PUBLIC_GOOGLE_CLIENT_ID=<same as backend GOOGLE_CLIENT_ID>
 
 ---
 
-## Admin frontend (`admin.gidtransfer.com`)
+## Admin frontend (separate project)
 
 **Who uses it:** platform staff managing photographers, support tickets, and studio SMS sender IDs.
 

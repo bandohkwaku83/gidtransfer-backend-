@@ -210,7 +210,7 @@ app.get("/api", (_req, res) => {
                 test: "POST /api/email/test (JSON: optional to)",
             },
             admin: {
-                note: "Separate admin frontend (e.g. https://admin.gidtransfer.com) — same API, JWT kind=admin",
+                note: "Separate admin frontend project — same API, JWT kind=admin",
                 login: "POST /api/admin/auth/login",
                 me: "GET /api/admin/auth/me",
                 stats: "GET /api/admin/stats",
