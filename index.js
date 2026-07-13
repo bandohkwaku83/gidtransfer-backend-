@@ -308,6 +308,7 @@ app.get("/api", (_req, res) => {
                 upcoming: "GET /api/bookings/upcoming",
                 list: "GET /api/bookings?year=&month=&type=&view=summary&since=&fields=&page=&limit=",
                 get: "GET /api/bookings/:id",
+                invoice: "POST /api/bookings/:id/invoice (JSON: issuedOn?, addOns?, amountPaying? — records income)",
                 create: "POST /api/bookings",
                 update: "PUT /api/bookings/:id",
                 delete: "DELETE /api/bookings/:id",

@@ -1,7 +1,8 @@
 import mongoose from "mongoose"
 import Booking from "../models/Booking.js"
 import Client from "../models/Client.js"
-import { BOOKING_SHOOT_TYPES } from "../utils/bookingShootTypes.js"
+import Income from "../models/Income.js"
+import { BOOKING_SHOOT_TYPES, shootTypeLabel } from "../utils/bookingShootTypes.js"
 import {
     bookingOwnerFilter,
     buildBookingListFilter,
@@ -10,6 +11,19 @@ import {
     parseBookingInput,
     weekRangeLocal,
 } from "../utils/bookingFields.js"
+import {
+    buildInvoiceNumber,
+    computeInvoiceTotal,
+    issuedOnIsoDate,
+    parseInvoiceAddOns,
+    parseInvoiceDate,
+} from "../utils/invoiceFields.js"
+import {
+    deriveIncomeStatus,
+    formatIncomeResponse,
+    incomeOwnerFilter,
+    validateIncomeAmounts,
+} from "../utils/incomeFields.js"
 import { clientOwnerFilter } from "../utils/clientFields.js"
 import { bookingDetailUrl } from "../utils/appLinks.js"
 import { buildBookingIcs } from "../utils/bookingCalendar.js"
@@ -390,6 +404,123 @@ export const updateBooking = async (req, res) => {
             return res.status(400).json({ message: validationMessage(error) })
         }
         console.error("Update booking error:", error)
+        return res.status(500).json({ message: "Server error" })
+    }
+}
+
+export const createBookingInvoice = async (req, res) => {
+    try {
+        const { error, query } = findOwnedBookingQuery(req.params.id, req.user._id)
+        if (error) {
+            return res.status(error.status).json({ message: error.message })
+        }
+
+        const booking = await query
+        if (!booking) {
+            return res.status(404).json({ message: "Booking not found" })
+        }
+
+        const clientDoc = booking.client
+        if (!clientDoc || typeof clientDoc !== "object") {
+            return res.status(400).json({ message: "Booking client is missing" })
+        }
+
+        const issuedResult = parseInvoiceDate(req.body?.issuedOn)
+        if (issuedResult.error) {
+            return res.status(400).json({ message: issuedResult.error })
+        }
+
+        const addOnsResult = parseInvoiceAddOns(req.body?.addOns)
+        if (addOnsResult.error) {
+            return res.status(400).json({ message: addOnsResult.error })
+        }
+
+        const totalAmount = computeInvoiceTotal(
+            booking.amountCharged ?? 0,
+            addOnsResult.addOns
+        )
+        if (totalAmount <= 0) {
+            return res.status(400).json({
+                message: "Invoice total must be greater than 0. Set a booking fee or add-ons.",
+            })
+        }
+
+        const amountPaying =
+            req.body?.amountPaying === undefined || req.body?.amountPaying === null
+                ? undefined
+                : Number(req.body.amountPaying)
+
+        if (
+            amountPaying !== undefined &&
+            (!Number.isFinite(amountPaying) || amountPaying < 0)
+        ) {
+            return res.status(400).json({ message: "Amount paying must be a valid non-negative number" })
+        }
+
+        const amountError = validateIncomeAmounts(
+            totalAmount,
+            amountPaying ?? 0
+        )
+        if (amountError) {
+            return res.status(400).json({ message: amountError })
+        }
+
+        const issuedOn = issuedResult.date
+        const invoiceNumber = buildInvoiceNumber(
+            booking._id,
+            issuedOnIsoDate(issuedOn)
+        )
+
+        const ownerId = req.user._id
+        const existing = await Income.findOne({
+            ...incomeOwnerFilter(ownerId),
+            booking: booking._id,
+        })
+
+        const resolvedAmountPaying =
+            amountPaying !== undefined
+                ? amountPaying
+                : existing
+                  ? Math.min(Number(existing.amountPaying ?? 0), totalAmount)
+                  : 0
+
+        const incomeFields = {
+            client: clientDoc._id,
+            clientName: clientDoc.name,
+            title: booking.title,
+            shootType: shootTypeLabel(booking.category),
+            totalAmount,
+            amountPaying: resolvedAmountPaying,
+            currency: booking.currency?.trim() || "GHS",
+            status: deriveIncomeStatus(totalAmount, resolvedAmountPaying),
+            booking: booking._id,
+            date: issuedOn,
+        }
+
+        let entry
+        if (existing) {
+            Object.assign(existing, incomeFields)
+            await existing.save()
+            entry = existing
+        } else {
+            entry = await Income.create({
+                owner: ownerId,
+                ...incomeFields,
+            })
+        }
+
+        await publishOwnerChange(ownerId)
+
+        return res.status(existing ? 200 : 201).json({
+            message: existing ? "Invoice updated in income." : "Invoice recorded in income.",
+            invoiceNumber,
+            entry: formatIncomeResponse(entry),
+        })
+    } catch (error) {
+        if (error.name === "ValidationError") {
+            return res.status(400).json({ message: validationMessage(error) })
+        }
+        console.error("Create booking invoice error:", error)
         return res.status(500).json({ message: "Server error" })
     }
 }

@@ -69,6 +69,7 @@ const incomeSchema = new mongoose.Schema(
 
 incomeSchema.index({ owner: 1, date: -1 })
 incomeSchema.index({ owner: 1, status: 1, date: -1 })
+incomeSchema.index({ owner: 1, booking: 1 }, { sparse: true })
 
 const Income = mongoose.model("Income", incomeSchema)
 

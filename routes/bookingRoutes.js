@@ -1,6 +1,7 @@
 import express from "express"
 import {
     createBooking,
+    createBookingInvoice,
     deleteBooking,
     getBooking,
     getBookingCalendar,
@@ -23,6 +24,7 @@ router.get("/stats", getBookingsStats)
 router.get("/upcoming", getUpcomingBooking)
 router.get("/", listBookings)
 router.get("/:id/calendar", getBookingCalendar)
+router.post("/:id/invoice", createBookingInvoice)
 router.get("/:id", getBooking)
 router.post("/", createBooking)
 router.put("/:id", updateBooking)
