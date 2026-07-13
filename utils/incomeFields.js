@@ -1,4 +1,5 @@
-import { parseAmountCharged } from "./bookingFields.js"
+import { parseAmountCharged, bookingOwnerFilter } from "./bookingFields.js"
+import { shootTypeLabel } from "./bookingShootTypes.js"
 
 export const INCOME_STATUSES = ["paid", "pending", "partial", "invoiced"]
 
@@ -182,6 +183,79 @@ export const buildIncomeListFilter = ({ ownerId, year }) => {
     }
 
     return filter
+}
+
+export const buildIncomeYearRange = (year) => {
+    if (year === undefined || year === null || String(year).trim() === "") {
+        return null
+    }
+    const y = Number(year)
+    if (!Number.isFinite(y)) return null
+    return {
+        start: new Date(y, 0, 1, 0, 0, 0, 0),
+        end: new Date(y, 11, 31, 23, 59, 59, 999),
+    }
+}
+
+export const buildUninvoicedBookingIncomeFilter = ({ ownerId, year, excludeBookingIds = [] }) => {
+    const filter = {
+        ...bookingOwnerFilter(ownerId),
+        amountCharged: { $gt: 0 },
+    }
+
+    if (excludeBookingIds.length) {
+        filter._id = { $nin: excludeBookingIds }
+    }
+
+    const range = buildIncomeYearRange(year)
+    if (range) {
+        filter.startsAt = { $gte: range.start, $lte: range.end }
+    }
+
+    return filter
+}
+
+export const formatBookingAsIncomeEntry = (booking) => {
+    const doc = booking.toJSON ? booking.toJSON() : booking
+    const client =
+        doc.client && typeof doc.client === "object"
+            ? doc.client
+            : null
+    const totalAmount = Number(doc.amountCharged ?? 0)
+
+    return {
+        _id: String(doc._id),
+        date: doc.startsAt,
+        clientId: client?._id ? String(client._id) : undefined,
+        clientName: client?.name?.trim() || "",
+        title: doc.title,
+        shootType: shootTypeLabel(doc.category),
+        totalAmount,
+        amountPaying: 0,
+        currency: doc.currency?.trim() || "GHS",
+        status: deriveIncomeStatus(totalAmount, 0),
+        bookingId: String(doc._id),
+        source: "booking",
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt,
+    }
+}
+
+export const mergeIncomeListEntries = (incomeEntries, bookingEntries) => {
+    const merged = [
+        ...incomeEntries.map((entry) => ({ ...entry, source: entry.source ?? "income" })),
+        ...bookingEntries,
+    ]
+
+    merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    return merged
+}
+
+export const paginateMergedEntries = (entries, { page, limit }) => {
+    const safePage = Math.max(1, Number(page) || 1)
+    const safeLimit = Math.max(1, Number(limit) || 100)
+    const start = (safePage - 1) * safeLimit
+    return entries.slice(start, start + safeLimit)
 }
 
 export const monthRangeLocal = (reference = new Date()) => {

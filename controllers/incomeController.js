@@ -7,17 +7,20 @@ import { clientOwnerFilter } from "../utils/clientFields.js"
 import {
     buildIncomeListFilter,
     deriveIncomeStatus,
+    formatBookingAsIncomeEntry,
     formatIncomeResponse,
+    buildUninvoicedBookingIncomeFilter,
     INCOME_STATUSES,
     INCOME_STATUS_LABELS,
     incomeOwnerFilter,
+    mergeIncomeListEntries,
     monthRangeLocal,
+    paginateMergedEntries,
     parseIncomeInput,
     validateIncomeAmounts,
 } from "../utils/incomeFields.js"
 import {
     buildPaginationMeta,
-    paginatedQuery,
     parsePagination,
 } from "../utils/pagination.js"
 
@@ -83,21 +86,45 @@ const roundMoney = (value) => Math.round(Number(value || 0) * 100) / 100
 
 export const listIncome = async (req, res) => {
     try {
+        const ownerId = req.user._id
+        const year = req.query.year
         const filter = buildIncomeListFilter({
-            ownerId: req.user._id,
-            year: req.query.year,
+            ownerId,
+            year,
         })
 
         const pagination = parsePagination(req.query, { defaultLimit: 100, maxLimit: 500 })
 
-        const [total, entries] = await Promise.all([
-            Income.countDocuments(filter),
-            paginatedQuery(Income.find(filter).sort({ date: -1 }), pagination).exec(),
+        const [incomeEntries, linkedBookingIds] = await Promise.all([
+            Income.find(filter).sort({ date: -1 }).lean(),
+            Income.distinct("booking", {
+                ...incomeOwnerFilter(ownerId),
+                booking: { $ne: null },
+            }),
         ])
+
+        const bookingFilter = buildUninvoicedBookingIncomeFilter({
+            ownerId,
+            year,
+            excludeBookingIds: linkedBookingIds,
+        })
+
+        const bookingEntries = await Booking.find(bookingFilter)
+            .populate({ path: "client", select: "name" })
+            .sort({ startsAt: -1 })
+            .lean()
+
+        const merged = mergeIncomeListEntries(
+            incomeEntries.map(formatIncomeResponse),
+            bookingEntries.map(formatBookingAsIncomeEntry)
+        )
+
+        const total = merged.length
+        const pageEntries = paginateMergedEntries(merged, pagination)
 
         return res.status(200).json({
             count: total,
-            entries: entries.map(formatIncomeResponse),
+            entries: pageEntries,
             pagination: buildPaginationMeta({ ...pagination, total }),
         })
     } catch (error) {

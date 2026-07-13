@@ -67,6 +67,12 @@ const bookingSchema = new mongoose.Schema(
             default: null,
             index: true,
         },
+        /** When a client invoice was issued for this booking. */
+        invoicedAt: {
+            type: Date,
+            default: null,
+            index: true,
+        },
     },
     { timestamps: true }
 )

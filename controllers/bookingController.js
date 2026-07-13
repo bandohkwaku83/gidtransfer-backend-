@@ -509,6 +509,9 @@ export const createBookingInvoice = async (req, res) => {
             })
         }
 
+        booking.invoicedAt = issuedOn
+        await booking.save()
+
         await publishOwnerChange(ownerId)
 
         return res.status(existing ? 200 : 201).json({
