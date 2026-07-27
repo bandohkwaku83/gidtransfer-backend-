@@ -17,7 +17,7 @@ Raw originals remain unmodified in storage (direct S3 PUT or local write). When 
 | File | Pattern | Purpose |
 |------|---------|---------|
 | Original | `{uuid}.jpg` | Full-quality master (`url`, `gridUrl`, `viewUrl` for photographers) |
-| Thumbnail (optional) | `{uuid}-thumb.jpg` | Only when `GALLERY_THUMB_MAX_PX` is set — optional `thumbUrl` |
+| Thumbnail | `{uuid}-thumb.jpg` | Default on (`GALLERY_THUMB_MAX_PX`, default 1200) — progressive JPEG `thumbUrl` |
 | Watermarked preview | `{uuid}-preview-wm.jpg` | Client full-screen preview (`displayUrl`) at full resolution |
 
 ---
@@ -69,7 +69,7 @@ When `applyPreviewWatermark` is omitted, the server falls back to the gallery's 
 }
 ```
 
-Videos skip derivative generation; only `url` is returned.
+Videos skip image derivatives; only `url` is returned until DASH packaging finishes. Then `posterUrl`, `dashUrl`, and `dashStatus` appear — see [media-progressive-jpeg-dash.md](./media-progressive-jpeg-dash.md).
 
 ---
 

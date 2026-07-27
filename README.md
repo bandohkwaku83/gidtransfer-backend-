@@ -43,7 +43,7 @@ All protected routes use `Authorization: Bearer <token>` from **register**, **lo
 | POST | `/api/auth/signout` | Alias for logout |
 | POST | `/api/onboarding` | Complete studio setup (multipart: `companyName`, `companySlug`, `phone`, `primaryDeliverable`, `country`; optional `referralCode`, `logo` file) |
 | GET | `/api/onboarding` | Studio profile |
-| PUT | `/api/onboarding` | Update studio profile (same fields; partial) |
+| PUT | `/api/onboarding` | Update studio profile (partial; optional `email`/`photographerEmail`, `logo`/`brandLogo`) |
 | GET | `/api/dashboard` | Dashboard stats |
 | GET/POST/PUT/DELETE | `/api/clients` | Client CRUD (scoped to the logged-in user) |
 | GET | `/api/bookings/meta` | Shoot types + legend for filters |

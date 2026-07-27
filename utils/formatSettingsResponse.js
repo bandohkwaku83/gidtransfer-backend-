@@ -99,7 +99,11 @@ export const formatSettingsResponse = ({
             companyName,
             phone: phone || null,
             website: website || null,
+            photographerEmail: doc.email || null,
+            email: doc.email || null,
             logoSrc: logoSrc ?? null,
+            companyLogo: logoSrc ?? null,
+            brandLogo: logoSrc ?? null,
             logoUrl: studio.logoUrl?.trim()
                 ? resolveMediaUrl(studio.logoUrl)
                 : null,
@@ -107,6 +111,7 @@ export const formatSettingsResponse = ({
         },
         account: {
             email: doc.email,
+            photographerEmail: doc.email,
             role: doc.role?.trim() || "Photographer",
             accountId: doc.accountId?.trim() || null,
         },

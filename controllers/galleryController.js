@@ -47,6 +47,12 @@ import {
     isRestoreExpired,
 } from "../utils/galleryTrash.js"
 import {
+    scheduleStudioGalleryDelete,
+    scheduleStudioGalleryIndex,
+    searchStudioGalleryIds,
+    orderDocsByIds,
+} from "../utils/opensearchStudio.js"
+import {
     mapGallerySmsError,
     notifyClientGalleryShareSms,
 } from "../utils/galleryShareSms.js"
@@ -137,9 +143,11 @@ export const listGalleries = async (req, res) => {
             String(trashParam) === "1" ||
             String(trashParam || "").toLowerCase() === "true"
 
+        const searchText = String(req.query.search ?? req.query.q ?? "").trim()
+
         const built = buildGalleryListFilter(req.user._id, {
             status: req.query.status,
-            search: req.query.search ?? req.query.q,
+            search: searchText || undefined,
             trashOnly,
         })
         if (built.filter === null) {
@@ -157,15 +165,60 @@ export const listGalleries = async (req, res) => {
         const pagination = parsePagination(req.query, { defaultLimit: 50, maxLimit: 100 })
         const summary = isSummaryView(req.query)
 
-        const [total, rows] = await Promise.all([
-            Gallery.countDocuments(built.filter),
-            paginatedQuery(
-                Gallery.find(built.filter)
-                    .populate(populateGalleryBasic)
-                    .sort({ updatedAt: -1 }),
-                pagination
-            ).exec(),
-        ])
+        let total
+        let rows
+        let searchEngine = null
+
+        if (searchText && !sinceParsed?.since) {
+            const statusKey = String(req.query.status ?? "")
+                .trim()
+                .toLowerCase()
+            try {
+                const osHit = await searchStudioGalleryIds(
+                    req.user._id,
+                    searchText,
+                    {
+                        from: pagination.skip,
+                        size: pagination.limit,
+                        trashOnly,
+                        status:
+                            statusKey && statusKey !== "all" ? statusKey : undefined,
+                    }
+                )
+                if (osHit) {
+                    searchEngine = osHit.engine
+                    total = osHit.total
+                    const found =
+                        osHit.ids.length > 0
+                            ? await Gallery.find({
+                                  _id: { $in: osHit.ids },
+                                  ...galleryOwnerFilter(req.user._id),
+                              })
+                                  .populate(populateGalleryBasic)
+                                  .exec()
+                            : []
+                    rows = orderDocsByIds(found, osHit.ids)
+                }
+            } catch (err) {
+                console.warn(
+                    "[opensearch] gallery search failed, using mongo:",
+                    err?.message ?? err
+                )
+            }
+        }
+
+        if (rows === undefined) {
+            ;[total, rows] = await Promise.all([
+                Gallery.countDocuments(built.filter),
+                paginatedQuery(
+                    Gallery.find(built.filter)
+                        .populate(populateGalleryBasic)
+                        .sort({ updatedAt: -1 }),
+                    pagination
+                ).exec(),
+            ])
+            if (searchText) searchEngine = "mongo"
+        }
 
         const formatRow = summary ? formatGallerySummaryResponse : formatGalleryResponse
         const galleries = rows.map(formatRow)
@@ -179,6 +232,9 @@ export const listGalleries = async (req, res) => {
                 counts,
                 galleries,
                 pagination: buildPaginationMeta({ ...pagination, total }),
+                ...(searchText
+                    ? { search: { engine: searchEngine, q: searchText } }
+                    : {}),
             },
             {
                 etagSeed: {
@@ -305,6 +361,7 @@ export const createGallery = async (req, res) => {
 
         await gallery.populate(populateGalleryBasic)
         invalidateGalleryCounts(req.user._id)
+        scheduleStudioGalleryIndex(gallery)
         return res.status(201).json({
             message: "Gallery created",
             gallery: formatGalleryResponse(gallery),
@@ -454,6 +511,7 @@ export const updateGallery = async (req, res) => {
 
         await gallery.populate(populateGalleryBasic)
         invalidateGalleryCounts(req.user._id)
+        scheduleStudioGalleryIndex(gallery)
         return res.status(200).json({
             message: "Gallery updated",
             gallery: formatGalleryResponse(gallery),
@@ -508,6 +566,7 @@ export const deleteGallery = async (req, res) => {
 
         const updated = await Gallery.findById(gallery._id)
         invalidateGalleryCounts(req.user._id)
+        scheduleStudioGalleryIndex(updated)
 
         return res.status(200).json({
             message: "Gallery moved to trash",
@@ -545,6 +604,7 @@ export const restoreGallery = async (req, res) => {
 
         await gallery.populate(populateGalleryBasic)
         invalidateGalleryCounts(req.user._id)
+        scheduleStudioGalleryIndex(gallery)
 
         return res.status(200).json({
             message: "Gallery restored",

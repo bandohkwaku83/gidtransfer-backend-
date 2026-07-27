@@ -558,7 +558,7 @@
     },
     {
       "name": "Onboarding",
-      "description": "Requires JWT (`{{token}}`). Run **Auth → Login** first. Use **Complete onboarding** once (all required fields + optional logo in one request).",
+      "description": "Requires JWT (`{{token}}`). Run **Auth → Login** first.\n\n- **Complete onboarding** once (required studio fields + optional brand logo).\n- **Update studio profile** for later edits — supports `email` / `photographerEmail` and `brandLogo` / `logo`.\n- SMS display name is used on Arkesel immediately (no admin approval).",
       "item": [
         {
           "name": "Get studio profile",
@@ -569,6 +569,18 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    const user = pm.response.json().user;",
+                  "    pm.test('photographer email', () => {",
+                  "        pm.expect(user).to.have.property('email');",
+                  "        pm.expect(user).to.have.property('photographerEmail');",
+                  "    });",
+                  "    if (user.studio) {",
+                  "        pm.test('studio brandLogo key', () => {",
+                  "            pm.expect(user.studio).to.have.property('brandLogo');",
+                  "        });",
+                  "    }",
+                  "}",
                   "if (pm.response.code === 401) {",
                   "    console.warn('Run Auth → Login then Me. Ensure Photo Global — Local environment is selected.');",
                   "}"
@@ -579,6 +591,7 @@
           "request": {
             "method": "GET",
             "header": [],
+            "description": "Returns `user.email`, `user.photographerEmail`, and `user.studio.brandLogo` (alias of logoSrc/companyLogo).",
             "url": "{{baseUrl}}/api/onboarding"
           },
           "response": []
@@ -647,7 +660,14 @@
                   "key": "smsSenderId",
                   "value": "Gidtransfer",
                   "type": "text",
-                  "description": "Required — SMS display name (max 11 letters/numbers; pending carrier approval)"
+                  "description": "Required — SMS display name (max 11 letters/numbers). Used on Arkesel immediately."
+                },
+                {
+                  "key": "email",
+                  "value": "{{email}}",
+                  "type": "text",
+                  "description": "Optional — photographer login email (aliases: photographerEmail). Usually already set at register.",
+                  "disabled": true
                 },
                 {
                   "key": "referralCode",
@@ -657,20 +677,54 @@
                   "disabled": true
                 },
                 {
+                  "key": "brandLogo",
+                  "type": "file",
+                  "src": [],
+                  "description": "Optional brand logo PNG/JPG, max 5MB (aliases: logo)"
+                },
+                {
                   "key": "logo",
                   "type": "file",
                   "src": [],
-                  "description": "Optional PNG/JPG, max 5MB — leave empty or pick a file"
+                  "description": "Optional — same as brandLogo; only send one",
+                  "disabled": true
                 }
               ]
             },
-            "description": "Single `POST /api/onboarding` with all required fields in one multipart request. Logo is optional — include the `logo` file only when you have one. Uses Bearer `{{token}}`.",
+            "description": "Single `POST /api/onboarding` with all required fields in one multipart request. Brand logo optional via `brandLogo` or `logo`. SMS sender ID is active immediately (no admin approval).",
             "url": "{{baseUrl}}/api/onboarding"
           },
           "response": []
         },
         {
           "name": "Update studio profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    const user = body.user;",
+                  "    pm.test('user returned', () => {",
+                  "        pm.expect(user).to.be.an('object');",
+                  "        pm.expect(user).to.have.property('photographerEmail');",
+                  "    });",
+                  "    if (body.requiresEmailVerification) {",
+                  "        console.warn('Email changed — run Auth → Verify email with the new OTP.');",
+                  "    }",
+                  "    const slug = user.studio?.companySlug;",
+                  "    if (slug) {",
+                  "        pm.collectionVariables.set('companySlug', slug);",
+                  "        if (pm.environment) pm.environment.set('companySlug', slug);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "PUT",
             "header": [],
@@ -678,19 +732,28 @@
               "mode": "formdata",
               "formdata": [
                 {
+                  "key": "email",
+                  "value": "{{email}}",
+                  "type": "text",
+                  "description": "Optional — photographer login email (aliases: photographerEmail). Changing it requires re-verification."
+                },
+                {
                   "key": "companyName",
                   "value": "Gidtransfer",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Business / studio name"
                 },
                 {
                   "key": "companySlug",
                   "value": "gidtransfer",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Studio URL slug"
                 },
                 {
                   "key": "primaryDeliverable",
                   "value": "photos_videos",
-                  "type": "text"
+                  "type": "text",
+                  "description": "photos | videos | photos_videos"
                 },
                 {
                   "key": "country",
@@ -700,12 +763,14 @@
                 {
                   "key": "phone",
                   "value": "+233200000001",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Business phone"
                 },
                 {
                   "key": "smsSenderId",
                   "value": "Gidtransfer",
-                  "type": "text"
+                  "type": "text",
+                  "description": "SMS display name — used on Arkesel immediately"
                 },
                 {
                   "key": "referralCode",
@@ -714,14 +779,28 @@
                   "disabled": true
                 },
                 {
+                  "key": "brandLogo",
+                  "type": "file",
+                  "src": [],
+                  "description": "Optional brand logo PNG/JPG (aliases: logo). Max 5MB."
+                },
+                {
                   "key": "logo",
                   "type": "file",
                   "src": [],
-                  "description": "Optional — only when replacing logo"
+                  "description": "Optional — same as brandLogo; only send one",
+                  "disabled": true
+                },
+                {
+                  "key": "clearBrandLogo",
+                  "value": "true",
+                  "type": "text",
+                  "description": "Set true to remove the brand logo (aliases: clearLogo)",
+                  "disabled": true
                 }
               ]
             },
-            "description": "Partial update — send only fields you want to change. Same multipart shape as **Complete onboarding**.",
+            "description": "Partial update (`PUT /api/onboarding`) — send only fields you want to change.\n\n**Email:** `email` or `photographerEmail`\n**Brand logo:** file `brandLogo` or `logo`, or data URL `brandLogoDataUrl` / `logoDataUrl`, or `clearBrandLogo=true`\n\nChanging email on an email/password account returns `requiresEmailVerification: true` and sends a new OTP.",
             "url": "{{baseUrl}}/api/onboarding"
           },
           "response": []
@@ -730,7 +809,7 @@
     },
     {
       "name": "SMS",
-      "description": "Studio SMS identity (Arkesel). Requires JWT. Approve sender IDs via Admin routes before branded sends use the studio name.",
+      "description": "Studio SMS identity (Arkesel). Requires JWT.\n\nSender IDs from the studio profile are used on send immediately — no admin approval step. Admin can still **reject** a sender ID to block it.",
       "item": [
         {
           "name": "Get SMS config",
@@ -1054,7 +1133,7 @@
           "response": []
         },
         {
-          "name": "List pending sender IDs",
+          "name": "List studio sender IDs",
           "request": {
             "auth": {
               "type": "bearer",
@@ -1062,7 +1141,8 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/api/admin/sms/sender-ids?status=pending"
+            "description": "List studio SMS sender IDs. `status` = pending|approved|rejected|all. Approval is no longer required for sending — use this to audit or find IDs to reject.",
+            "url": "{{baseUrl}}/api/admin/sms/sender-ids?status=all"
           },
           "response": []
         },
@@ -1075,7 +1155,26 @@
             },
             "method": "PATCH",
             "header": [],
+            "description": "Optional — studios are auto-approved when they save a sender ID. Use to re-approve after a reject.",
             "url": "{{baseUrl}}/api/admin/sms/sender-ids/{{userId}}/approve"
+          },
+          "response": []
+        },
+        {
+          "name": "Reject studio sender ID",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Name conflicts with another brand\"\n}"
+            },
+            "description": "Blocks the studio sender ID — outbound SMS falls back to ARKESEL_DEFAULT_SENDER until they pick another name.",
+            "url": "{{baseUrl}}/api/admin/sms/sender-ids/{{userId}}/reject"
           },
           "response": []
         }
@@ -1083,7 +1182,7 @@
     },
     {
       "name": "Settings",
-      "description": "Profile settings screen — profile card, overview stats, studio details, logo, and account info. Requires JWT (`{{token}}`).",
+      "description": "Profile settings — profile card, overview, studio details (including photographer email + brand logo), account info. Requires JWT (`{{token}}`).",
       "item": [
         {
           "name": "Get settings",
@@ -1102,6 +1201,11 @@
                   "        pm.expect(body.settings.overview).to.be.an('object');",
                   "        pm.expect(body.settings.studio).to.be.an('object');",
                   "        pm.expect(body.settings.account).to.be.an('object');",
+                  "    });",
+                  "    pm.test('studio email + brandLogo', () => {",
+                  "        pm.expect(body.settings.studio).to.have.property('photographerEmail');",
+                  "        pm.expect(body.settings.studio).to.have.property('brandLogo');",
+                  "        pm.expect(body.settings.account).to.have.property('photographerEmail');",
                   "    });",
                   "    const accountId = body.settings.account?.accountId;",
                   "    if (accountId) {",
@@ -1139,9 +1243,29 @@
         },
         {
           "name": "Get settings studio",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    const studio = pm.response.json().studio;",
+                  "    pm.test('studio fields', () => {",
+                  "        pm.expect(studio).to.have.property('photographerEmail');",
+                  "        pm.expect(studio).to.have.property('brandLogo');",
+                  "        pm.expect(studio).to.have.property('companyName');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
+            "description": "Studio block includes `photographerEmail`, `brandLogo`, `logoSrc`, `companyLogo`.",
             "url": "{{baseUrl}}/api/settings/studio"
           },
           "response": []
@@ -1163,7 +1287,13 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('OK (200)', () => pm.response.to.have.status(200));"
+                  "pm.test('OK (200)', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    if (body.requiresEmailVerification) {",
+                  "        console.warn('Email changed — run Auth → Verify email with the new OTP.');",
+                  "    }",
+                  "}"
                 ]
               }
             }
@@ -1187,6 +1317,12 @@
                   "description": "Studio URL slug"
                 },
                 {
+                  "key": "email",
+                  "value": "{{email}}",
+                  "type": "text",
+                  "description": "Photographer login email (aliases: photographerEmail). Changing it requires re-verification."
+                },
+                {
                   "key": "phone",
                   "value": "+233200000000",
                   "type": "text",
@@ -1199,20 +1335,48 @@
                   "description": "Website (optional)"
                 },
                 {
+                  "key": "smsSenderId",
+                  "value": "Gidtransfer",
+                  "type": "text",
+                  "description": "Optional — SMS display name (used immediately on Arkesel)",
+                  "disabled": true
+                },
+                {
+                  "key": "brandLogo",
+                  "type": "file",
+                  "src": [],
+                  "description": "Optional brand logo PNG/JPG (aliases: logo). Max 5MB."
+                },
+                {
                   "key": "logo",
                   "type": "file",
                   "src": [],
-                  "description": "Optional studio logo PNG/JPG"
+                  "description": "Optional — same as brandLogo; only send one",
+                  "disabled": true
                 },
                 {
                   "key": "avatar",
                   "type": "file",
                   "src": [],
                   "description": "Optional profile photo PNG/JPG, max 1.2 MB"
+                },
+                {
+                  "key": "clearBrandLogo",
+                  "value": "true",
+                  "type": "text",
+                  "description": "Set true to remove brand logo (aliases: clearLogo)",
+                  "disabled": true
+                },
+                {
+                  "key": "clearAvatar",
+                  "value": "true",
+                  "type": "text",
+                  "description": "Set true to remove avatar",
+                  "disabled": true
                 }
               ]
             },
-            "description": "Save profile settings. Send only fields you want to change. Use clearLogo=true or clearAvatar=true to remove images.",
+            "description": "Save profile settings (`PUT /api/settings`). Partial — send only fields you want to change.\n\n**Email:** `email` / `photographerEmail`\n**Brand logo:** `brandLogo` or `logo` file, or `clearBrandLogo=true`\n**Avatar:** `avatar` file or `clearAvatar=true`\n\nIf email changes: `requiresEmailVerification: true` + OTP emailed.",
             "url": "{{baseUrl}}/api/settings"
           },
           "response": []

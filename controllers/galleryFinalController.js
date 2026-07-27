@@ -11,7 +11,7 @@ import {
     isRestoreExpired,
 } from "../utils/galleryTrash.js"
 import {
-    deleteGalleryFinalFile,
+    deleteGalleryFinalAssets,
     saveGalleryFinalFile,
     validateGalleryFinalFile,
     validateGalleryFinalMeta,
@@ -21,6 +21,7 @@ import {
 } from "../utils/galleryFinalStorage.js"
 import { parseDirectUploadFiles } from "../utils/directUploadHelpers.js"
 import { s3Configured } from "../utils/s3Storage.js"
+import { scheduleGalleryVideoDash } from "../utils/galleryVideoQueue.js"
 import {
     GALLERY_MEDIA_SORT,
     getNextGalleryMediaSortOrder,
@@ -243,6 +244,7 @@ export const completeGalleryFinalUploads = async (req, res) => {
                 mimeType: file.mimeType,
                 sizeBytes: file.sizeBytes,
                 isVideo,
+                dashStatus: isVideo ? "pending" : null,
                 clientPaid,
                 outstandingBalanceGhs,
                 isLocked,
@@ -250,6 +252,15 @@ export const completeGalleryFinalUploads = async (req, res) => {
                 ...(uploadSetId !== undefined ? { set: uploadSetId } : {}),
             })
             nextSortOrder += 1
+            scheduleGalleryVideoDash({
+                kind: "final",
+                mediaId: row._id,
+                galleryId: gallery._id,
+                storedFilename: file.storedFilename,
+                mimeType: file.mimeType,
+                sizeBytes: file.sizeBytes,
+                isVideo,
+            })
             created.push(formatGalleryFinalResponse(row))
         }
 
@@ -319,6 +330,7 @@ export const uploadGalleryFinals = async (req, res) => {
                 mimeType: file.mimetype,
                 sizeBytes: file.size,
                 isVideo: saved.isVideo,
+                dashStatus: saved.isVideo ? "pending" : null,
                 clientPaid,
                 outstandingBalanceGhs,
                 isLocked,
@@ -326,6 +338,15 @@ export const uploadGalleryFinals = async (req, res) => {
                 ...(uploadSetId !== undefined ? { set: uploadSetId } : {}),
             })
             nextSortOrder += 1
+            scheduleGalleryVideoDash({
+                kind: "final",
+                mediaId: row._id,
+                galleryId: gallery._id,
+                storedFilename: saved.storedFilename,
+                mimeType: file.mimetype,
+                sizeBytes: file.size,
+                isVideo: saved.isVideo,
+            })
             created.push(formatGalleryFinalResponse(row))
         }
 

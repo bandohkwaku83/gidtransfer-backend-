@@ -15,6 +15,12 @@ import { buildUpdatedSinceFilter, parseSinceQuery } from "../utils/incrementalSy
 import { isSummaryView } from "../utils/sparseFields.js"
 import { sendOwnerJson } from "../utils/listResponse.js"
 import { publishOwnerChange } from "../utils/syncRevision.js"
+import {
+    orderDocsByIds,
+    scheduleStudioClientDelete,
+    scheduleStudioClientIndex,
+    searchStudioClientIds,
+} from "../utils/opensearchStudio.js"
 
 const validationMessage = (error) =>
     Object.values(error.errors)
@@ -33,28 +39,62 @@ const findOwnedClient = (id, userId) => {
 export const listClients = async (req, res) => {
     try {
         const search = req.query.search ?? req.query.q
+        const searchText = String(search ?? "").trim()
         const sinceParsed = parseSinceQuery(req.query)
         if (sinceParsed?.error) {
             return res.status(400).json({ message: sinceParsed.error })
         }
 
         const pagination = parsePagination(req.query, { defaultLimit: 50, maxLimit: 200 })
-        const filter = {
-            ...clientOwnerFilter(req.user._id),
-            ...buildClientSearchFilter(search),
-            ...(sinceParsed?.since
-                ? buildUpdatedSinceFilter(sinceParsed.since)
-                : {}),
-        }
         const summary = isSummaryView(req.query)
 
-        const [total, rows] = await Promise.all([
-            Client.countDocuments(filter),
-            paginatedQuery(
-                Client.find(filter).sort({ createdAt: -1 }),
-                pagination
-            ).exec(),
-        ])
+        let total
+        let rows
+        let searchEngine = null
+
+        if (searchText && !sinceParsed?.since) {
+            try {
+                const osHit = await searchStudioClientIds(req.user._id, searchText, {
+                    from: pagination.skip,
+                    size: pagination.limit,
+                })
+                if (osHit) {
+                    searchEngine = osHit.engine
+                    total = osHit.total
+                    const found =
+                        osHit.ids.length > 0
+                            ? await Client.find({
+                                  _id: { $in: osHit.ids },
+                                  ...clientOwnerFilter(req.user._id),
+                              }).exec()
+                            : []
+                    rows = orderDocsByIds(found, osHit.ids)
+                }
+            } catch (err) {
+                console.warn(
+                    "[opensearch] client search failed, using mongo:",
+                    err?.message ?? err
+                )
+            }
+        }
+
+        if (rows === undefined) {
+            const filter = {
+                ...clientOwnerFilter(req.user._id),
+                ...buildClientSearchFilter(search),
+                ...(sinceParsed?.since
+                    ? buildUpdatedSinceFilter(sinceParsed.since)
+                    : {}),
+            }
+            ;[total, rows] = await Promise.all([
+                Client.countDocuments(filter),
+                paginatedQuery(
+                    Client.find(filter).sort({ createdAt: -1 }),
+                    pagination
+                ).exec(),
+            ])
+            if (searchText) searchEngine = "mongo"
+        }
 
         const clients = summary ? rows.map(formatClientSummary) : rows
 
@@ -66,6 +106,9 @@ export const listClients = async (req, res) => {
                 count: total,
                 clients,
                 pagination: buildPaginationMeta({ ...pagination, total }),
+                ...(searchText
+                    ? { search: { engine: searchEngine, q: searchText } }
+                    : {}),
             },
             {
                 etagSeed: {
@@ -113,6 +156,7 @@ export const createClient = async (req, res) => {
         })
 
         await publishOwnerChange(req.user._id)
+        scheduleStudioClientIndex(client)
 
         return res.status(201).json({
             message: "Client created successfully",
@@ -153,6 +197,7 @@ export const updateClient = async (req, res) => {
         }
 
         await publishOwnerChange(req.user._id)
+        scheduleStudioClientIndex(client)
 
         return res.status(200).json({
             message: "Client updated successfully",
@@ -184,6 +229,7 @@ export const deleteClient = async (req, res) => {
         }
 
         await publishOwnerChange(req.user._id)
+        scheduleStudioClientDelete(client._id)
 
         return res.status(200).json({
             message: "Client deleted successfully",

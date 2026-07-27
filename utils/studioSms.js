@@ -21,6 +21,8 @@ export const formatSmsSenderFields = (studio) => {
         smsSenderId ||
         (companyName ? suggestSmsSenderIdFromCompanyName(companyName) : "") ||
         null
+    const smsBrandingReady =
+        Boolean(smsSenderId) && smsSenderStatus !== "rejected"
 
     return {
         ...(smsSenderId ? { smsSenderId } : {}),
@@ -35,16 +37,17 @@ export const formatSmsSenderFields = (studio) => {
             ? { smsSenderRejectedReason: s.smsSenderRejectedReason.trim() }
             : {}),
         ...(suggestedSmsSenderId ? { suggestedSmsSenderId } : {}),
-        smsBrandingReady: smsSenderStatus === "approved" && Boolean(smsSenderId),
+        smsBrandingReady,
     }
 }
 
+/** Use the studio sender ID on Arkesel as soon as it is set (no admin approval). */
 export const resolveSmsSenderForStudio = (studio) => {
     const s = studio ?? {}
     const requested = s.smsSenderId?.trim()
     const status = s.smsSenderStatus || "none"
 
-    if (requested && status === "approved") {
+    if (requested && status !== "rejected") {
         return requested
     }
 
@@ -98,10 +101,12 @@ export const applySmsSenderIdToStudio = async (
 
     await assertSmsSenderIdAvailable(nextId, { excludeUserId: userId })
 
+    const now = new Date()
     studio.smsSenderId = nextId
-    studio.smsSenderStatus = "pending"
-    studio.smsSenderRequestedAt = new Date()
-    studio.smsSenderApprovedAt = undefined
+    // Use immediately on Arkesel — no admin approval gate.
+    studio.smsSenderStatus = "approved"
+    studio.smsSenderRequestedAt = now
+    studio.smsSenderApprovedAt = now
     studio.smsSenderRejectedReason = ""
 }
 
@@ -130,9 +135,12 @@ export const rejectStudioSmsSender = (studio, reason = "") => {
 const brandMessageForStudio = (studio, message) => {
     const text = String(message ?? "").trim()
     const companyName = studio?.companyName?.trim()
-    const status = studio?.smsSenderStatus || "none"
+    const usingStudioSender =
+        Boolean(studio?.smsSenderId?.trim()) &&
+        (studio?.smsSenderStatus || "none") !== "rejected"
 
-    if (status === "approved" || !companyName) {
+    // Only prefix company name when falling back to the platform default sender.
+    if (usingStudioSender || !companyName) {
         return text
     }
 
@@ -154,12 +162,17 @@ export const sendStudioSms = async ({ studio, to, message }) => {
     const sender = resolveSmsSenderForStudio(studio)
     if (!sender) {
         throw new ArkeselSmsError(
-            "No SMS sender is available. Configure ARKESEL_DEFAULT_SENDER or approve the studio sender ID.",
+            "No SMS sender is available. Set a studio SMS display name or configure ARKESEL_DEFAULT_SENDER.",
             { code: "NO_SENDER" }
         )
     }
 
     const brandedMessage = brandMessageForStudio(studio, message)
+    const usingStudioSender =
+        Boolean(studio?.smsSenderId?.trim()) &&
+        (studio?.smsSenderStatus || "none") !== "rejected" &&
+        sender === studio.smsSenderId.trim()
+
     const result = await sendArkeselSms({
         sender,
         message: brandedMessage,
@@ -170,7 +183,7 @@ export const sendStudioSms = async ({ studio, to, message }) => {
         recipient,
         sender,
         message: brandedMessage,
-        usedStudioBranding: studio?.smsSenderStatus === "approved",
+        usedStudioBranding: usingStudioSender,
         result,
     }
 }

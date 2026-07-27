@@ -40,6 +40,27 @@ const galleryPhotoSchema = new mongoose.Schema(
             type: String,
             default: null,
         },
+        /** Progressive JPEG poster frame for videos (`*-poster.jpg`). */
+        posterStoredFilename: {
+            type: String,
+            default: null,
+        },
+        /** MPEG-DASH manifest path (`{uuid}-dash/manifest.mpd`). */
+        dashManifestStoredFilename: {
+            type: String,
+            default: null,
+        },
+        /** DASH packaging lifecycle. */
+        dashStatus: {
+            type: String,
+            enum: ["pending", "processing", "ready", "failed", "skipped"],
+            default: null,
+        },
+        dashError: {
+            type: String,
+            trim: true,
+            default: null,
+        },
         url: {
             type: String,
             required: true,
@@ -121,6 +142,32 @@ const galleryPhotoSchema = new mongoose.Schema(
             type: Number,
             default: 0,
             index: true,
+        },
+        /** Vision + heuristic analysis for client AI selection helpers. */
+        aiAnalysis: {
+            status: {
+                type: String,
+                enum: ["pending", "processing", "ready", "failed", "skipped"],
+                default: null,
+            },
+            qualityScore: { type: Number, default: null },
+            faceCount: { type: Number, default: null },
+            eyesOpen: { type: Boolean, default: null },
+            isBlurry: { type: Boolean, default: null },
+            sceneLabel: { type: String, trim: true, default: null },
+            tags: { type: [String], default: [] },
+            issues: { type: [String], default: [] },
+            /** dHash hex — used to cluster near-duplicates. */
+            perceptualHash: { type: String, default: null },
+            duplicateGroupId: { type: String, default: null, index: true },
+            /** True when this photo is in the AI suggested set for the gallery. */
+            suggested: { type: Boolean, default: false, index: true },
+            suggestionScore: { type: Number, default: null },
+            suggestionReason: { type: String, trim: true, default: null },
+            /** Best pick within a duplicate cluster. */
+            isBestInGroup: { type: Boolean, default: false },
+            analyzedAt: { type: Date, default: null },
+            error: { type: String, trim: true, default: null },
         },
     },
     { timestamps: true }

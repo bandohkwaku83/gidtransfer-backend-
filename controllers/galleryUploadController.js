@@ -23,6 +23,7 @@ import {
 import { parseDirectUploadFiles } from "../utils/directUploadHelpers.js"
 import { s3Configured } from "../utils/s3Storage.js"
 import { scheduleGalleryPhotoDerivatives } from "../utils/galleryDerivativeQueue.js"
+import { scheduleGalleryVideoDash } from "../utils/galleryVideoQueue.js"
 import { resolveWatermarkPreviewText } from "../utils/previewWatermark.js"
 import {
     GALLERY_MEDIA_SORT,
@@ -37,6 +38,14 @@ import {
     parsePagination,
 } from "../utils/pagination.js"
 import { isSummaryView } from "../utils/sparseFields.js"
+import {
+    galleryPhotoSearchHasCriteria,
+    parseGalleryPhotoSearchParams,
+    scheduleGalleryPhotoIndex,
+    scheduleGalleryPhotosReindex,
+    searchGalleryPhotos,
+} from "../utils/opensearchPhotos.js"
+import { orderDocsByIds } from "../utils/opensearchStudio.js"
 
 const parseOnConflict = (value) => {
     const s = String(value ?? "skip").trim().toLowerCase()
@@ -102,6 +111,10 @@ async function persistGalleryPhotoWithDerivatives({
         replace.isVideo = saved.isVideo
         replace.thumbStoredFilename = null
         replace.previewWmStoredFilename = null
+        replace.posterStoredFilename = null
+        replace.dashManifestStoredFilename = null
+        replace.dashStatus = saved.isVideo ? "pending" : null
+        replace.dashError = null
         if (uploadSetId !== undefined) replace.set = uploadSetId
         await replace.save()
 
@@ -112,6 +125,15 @@ async function persistGalleryPhotoWithDerivatives({
             mimeType,
             watermarkText,
             applyWatermark: applyPreviewWatermark,
+        })
+        scheduleGalleryVideoDash({
+            kind: "photo",
+            mediaId: replace._id,
+            galleryId: gallery._id,
+            storedFilename: saved.storedFilename,
+            mimeType,
+            sizeBytes,
+            isVideo: saved.isVideo,
         })
         return replace
     }
@@ -133,6 +155,7 @@ async function persistGalleryPhotoWithDerivatives({
         mimeType,
         sizeBytes,
         isVideo: saved.isVideo,
+        dashStatus: saved.isVideo ? "pending" : null,
         sortOrder: nextSortOrder,
         ...(uploadSetId !== undefined ? { set: uploadSetId } : {}),
     })
@@ -145,6 +168,16 @@ async function persistGalleryPhotoWithDerivatives({
         watermarkText,
         applyWatermark: applyPreviewWatermark,
     })
+    scheduleGalleryVideoDash({
+        kind: "photo",
+        mediaId: photo._id,
+        galleryId: gallery._id,
+        storedFilename: saved.storedFilename,
+        mimeType,
+        sizeBytes,
+        isVideo: saved.isVideo,
+    })
+    scheduleGalleryPhotoIndex(photo)
 
     return photo
 }
@@ -157,10 +190,10 @@ export const listGalleryUploads = async (req, res) => {
             return res.status(404).json({ message: "Gallery not found" })
         }
 
-        const includeTrash =
-            String(req.query.trash) === "1" ||
-            String(req.query.trash || "").toLowerCase() === "true"
+        const searchParams = parseGalleryPhotoSearchParams(req.query)
+        const useSearch = galleryPhotoSearchHasCriteria(searchParams)
 
+        const includeTrash = searchParams.includeTrash
         const filter = { gallery: gallery._id }
         if (!includeTrash) {
             filter.deletedAt = null
@@ -177,7 +210,48 @@ export const listGalleryUploads = async (req, res) => {
         const photoOptions = { absoluteUrls: true }
         const formatPhoto = gridView
             ? (row) => formatGalleryPhotoGridResponse(row, photoOptions)
-            : (row) => formatGalleryPhotoResponse(row, photoOptions)
+            : (row) =>
+                  formatGalleryPhotoResponse(row, {
+                      ...photoOptions,
+                      includeAi: useSearch,
+                  })
+
+        if (useSearch) {
+            const hit = await searchGalleryPhotos(gallery._id, req.query, {
+                skip: pagination.skip,
+                limit: pagination.limit,
+            })
+            const rows =
+                hit.ids.length > 0
+                    ? await GalleryPhoto.find({
+                          _id: { $in: hit.ids },
+                          gallery: gallery._id,
+                      }).exec()
+                    : []
+            const ordered = orderDocsByIds(rows, hit.ids)
+
+            return res.status(200).json({
+                photos: ordered.map((row) => formatPhoto(row)),
+                pagination: buildPaginationMeta({
+                    ...pagination,
+                    total: hit.total,
+                }),
+                view: gridView ? "grid" : "full",
+                search: {
+                    engine: hit.engine,
+                    q: searchParams.q ?? null,
+                    filters: {
+                        scene: searchParams.scene ?? null,
+                        tags: searchParams.tags ?? null,
+                        suggested: searchParams.suggested ?? null,
+                        blurry: searchParams.isBlurry ?? null,
+                        eyesOpen: searchParams.eyesOpen ?? null,
+                        minQuality: searchParams.minQuality ?? null,
+                        maxQuality: searchParams.maxQuality ?? null,
+                    },
+                },
+            })
+        }
 
         const [total, rows] = await Promise.all([
             GalleryPhoto.countDocuments(filter),
@@ -599,6 +673,7 @@ export const deleteGalleryPhoto = async (req, res) => {
         photo.deletedAt = now
         photo.restoreDeadline = computeRestoreDeadline(now)
         await photo.save()
+        scheduleGalleryPhotoIndex(photo)
 
         return res.status(200).json({
             message: "Photo moved to trash",
@@ -643,6 +718,7 @@ export const restoreGalleryPhoto = async (req, res) => {
             gallery._id
         )
         await photo.save()
+        scheduleGalleryPhotoIndex(photo)
 
         return res.status(200).json({
             message: "Photo restored",
@@ -682,6 +758,7 @@ export const bulkDeleteGalleryPhotos = async (req, res) => {
         const result = await GalleryPhoto.updateMany(filter, {
             $set: { deletedAt: now, restoreDeadline: deadline },
         })
+        scheduleGalleryPhotosReindex(gallery._id)
 
         return res.status(200).json({
             message: "Photos moved to trash",

@@ -59,6 +59,20 @@ import {
     buildPaginationMeta,
     parsePagination,
 } from "../utils/pagination.js"
+import {
+    galleryAiAnalysisSummary,
+    pauseGalleryAiAnalysis,
+    startGalleryAiAnalysis,
+    terminateGalleryAiAnalysis,
+} from "../utils/galleryPhotoAiQueue.js"
+import { loadGalleryAiSuggestions } from "../utils/galleryPhotoAiSuggestions.js"
+import { galleryAiSelectionEnabled } from "../utils/galleryPhotoAiAnalysis.js"
+import {
+    scheduleGalleryPhotoIndex,
+    scheduleGalleryPhotosReindex,
+    searchGalleryPhotos,
+} from "../utils/opensearchPhotos.js"
+import { orderDocsByIds } from "../utils/opensearchStudio.js"
 
 function galleryClientName(gallery) {
     return gallery.client?.name?.trim() || "Your client"
@@ -253,6 +267,7 @@ async function buildPublicGalleryPayload(hit, { query } = {}) {
                   }),
               }
             : {}),
+        aiSelection: await galleryAiAnalysisSummary(gallery._id),
     }
 }
 
@@ -525,6 +540,7 @@ async function toggleSelectionForGallery(gallery, req, res) {
     }
 
     await photo.save()
+    scheduleGalleryPhotoIndex(photo)
 
     if (comment !== undefined && String(comment).trim()) {
         queueGalleryEmail(
@@ -711,6 +727,354 @@ async function submitSelectionsForGallery(gallery, req, res) {
 export const submitPublicSelections = (req, res) =>
     handlePublicMutation(req, res, ({ gallery }, req, res) =>
         submitSelectionsForGallery(gallery, req, res)
+    )
+
+async function buildPublicAiSuggestionsPayload(gallery, photoOptions) {
+    const summary = await galleryAiAnalysisSummary(gallery._id)
+    const formatPhoto = (p) => formatPublicGalleryPhotoResponse(p, photoOptions)
+
+    if (summary.runStatus === "terminated") {
+        return {
+            aiSelection: summary,
+            suggestions: [],
+            duplicateGroups: [],
+            selectionLimit: gallery.maxSelections ?? null,
+        }
+    }
+
+    if (summary.readyCount === 0 && summary.suggestedCount === 0) {
+        return {
+            aiSelection: summary,
+            suggestions: [],
+            duplicateGroups: [],
+            selectionLimit: gallery.maxSelections ?? null,
+        }
+    }
+
+    const result = await loadGalleryAiSuggestions(gallery._id, {
+        maxSelections: gallery.maxSelections ?? null,
+    })
+    const aiSelection = await galleryAiAnalysisSummary(gallery._id)
+
+    return {
+        aiSelection,
+        suggestions: result.photos.map(formatPhoto),
+        duplicateGroups: result.duplicateGroups ?? [],
+        selectionLimit: gallery.maxSelections ?? null,
+    }
+}
+
+export const getPublicAiSuggestions = (req, res) =>
+    handlePublicMutation(req, res, async ({ gallery }, req, res) => {
+        if (!galleryAiSelectionEnabled()) {
+            return res.status(503).json({
+                message: "AI selection is not enabled on this server",
+                aiSelection: { enabled: false, runStatus: "idle" },
+            })
+        }
+
+        const payload = await buildPublicAiSuggestionsPayload(gallery, {
+            absoluteUrls: true,
+            watermarkPreviewEnabled: gallery.watermarkPreviewEnabled === true,
+        })
+        return res.status(200).json(payload)
+    })
+
+/** Search / filter public gallery photos (OpenSearch when enabled, else Mongo). */
+export const searchPublicGalleryPhotos = (req, res) =>
+    handlePublicMutation(req, res, async ({ gallery }, req, res) => {
+        const pagination = parsePagination(req.query, {
+            defaultLimit: 48,
+            maxLimit: 200,
+        })
+        const hit = await searchGalleryPhotos(gallery._id, req.query, {
+            skip: pagination.skip,
+            limit: pagination.limit,
+        })
+
+        const rows =
+            hit.ids.length > 0
+                ? await GalleryPhoto.find({
+                      _id: { $in: hit.ids },
+                      ...galleryPublicBrowsePhotoFilter(gallery._id),
+                  }).exec()
+                : []
+        const ordered = orderDocsByIds(rows, hit.ids)
+        const photoOptions = {
+            absoluteUrls: true,
+            watermarkPreviewEnabled: gallery.watermarkPreviewEnabled === true,
+        }
+
+        return res.status(200).json({
+            photos: ordered.map((row) =>
+                formatPublicGalleryPhotoResponse(row, photoOptions)
+            ),
+            pagination: buildPaginationMeta({
+                ...pagination,
+                total: hit.total,
+            }),
+            search: {
+                engine: hit.engine,
+                q: hit.params.q ?? null,
+                filters: {
+                    scene: hit.params.scene ?? null,
+                    tags: hit.params.tags ?? null,
+                    suggested: hit.params.suggested ?? null,
+                    blurry: hit.params.isBlurry ?? null,
+                    eyesOpen: hit.params.eyesOpen ?? null,
+                    minQuality: hit.params.minQuality ?? null,
+                    maxQuality: hit.params.maxQuality ?? null,
+                    selected: hit.params.selectedByClient ?? null,
+                    rejected: hit.params.rejectedByClient ?? null,
+                },
+            },
+        })
+    })
+
+export const startPublicAiSuggestions = (req, res) =>
+    handlePublicMutation(req, res, async ({ gallery }, req, res) => {
+        if (!galleryAiSelectionEnabled()) {
+            return res.status(503).json({
+                message: "AI selection is not enabled on this server",
+                aiSelection: { enabled: false, runStatus: "idle" },
+            })
+        }
+
+        const result = await startGalleryAiAnalysis(gallery._id, {
+            maxSelections: gallery.maxSelections ?? null,
+        })
+
+        return res.status(200).json({
+            message: result.message ?? "AI suggestions started",
+            aiSelection: result,
+            queued: result.queued ?? 0,
+        })
+    })
+
+export const pausePublicAiSuggestions = (req, res) =>
+    handlePublicMutation(req, res, async ({ gallery }, req, res) => {
+        if (!galleryAiSelectionEnabled()) {
+            return res.status(503).json({
+                message: "AI selection is not enabled on this server",
+                aiSelection: { enabled: false, runStatus: "idle" },
+            })
+        }
+
+        const result = await pauseGalleryAiAnalysis(gallery._id)
+        return res.status(200).json({
+            message: result.message ?? "AI suggestions paused",
+            aiSelection: result,
+        })
+    })
+
+export const resumePublicAiSuggestions = (req, res) =>
+    handlePublicMutation(req, res, async ({ gallery }, req, res) => {
+        if (!galleryAiSelectionEnabled()) {
+            return res.status(503).json({
+                message: "AI selection is not enabled on this server",
+                aiSelection: { enabled: false, runStatus: "idle" },
+            })
+        }
+
+        const current = await galleryAiAnalysisSummary(gallery._id)
+        if (current.runStatus !== "paused" && current.runStatus !== "idle") {
+            if (current.runStatus === "running") {
+                return res.status(200).json({
+                    message: "AI suggestions already running",
+                    aiSelection: current,
+                })
+            }
+            if (current.runStatus === "terminated") {
+                return res.status(400).json({
+                    message:
+                        "AI suggestions were terminated. Call start to begin a new run.",
+                    aiSelection: current,
+                })
+            }
+        }
+
+        const result = await startGalleryAiAnalysis(gallery._id, {
+            maxSelections: gallery.maxSelections ?? null,
+        })
+
+        return res.status(200).json({
+            message: "AI suggestions resumed",
+            aiSelection: result,
+            queued: result.queued ?? 0,
+        })
+    })
+
+export const terminatePublicAiSuggestions = (req, res) =>
+    handlePublicMutation(req, res, async ({ gallery }, req, res) => {
+        if (!galleryAiSelectionEnabled()) {
+            return res.status(503).json({
+                message: "AI selection is not enabled on this server",
+                aiSelection: { enabled: false, runStatus: "idle" },
+            })
+        }
+
+        const result = await terminateGalleryAiAnalysis(gallery._id)
+        return res.status(200).json({
+            message: result.message ?? "AI suggestions terminated",
+            aiSelection: result,
+            suggestions: [],
+            duplicateGroups: [],
+        })
+    })
+
+async function applyAiSuggestionsForGallery(gallery, req, res) {
+    if (!canEditSelections(gallery)) {
+        return selectionLockedResponse(res)
+    }
+
+    if (!galleryAiSelectionEnabled()) {
+        return res.status(503).json({
+            message: "AI selection is not enabled on this server",
+        })
+    }
+
+    const replaceExisting = req.body?.replaceExisting === true
+    const requestedIds = Array.isArray(req.body?.photoIds)
+        ? req.body.photoIds.map(String)
+        : null
+
+    await loadGalleryAiSuggestions(gallery._id, {
+        maxSelections: gallery.maxSelections ?? null,
+    })
+
+    let candidates = await GalleryPhoto.find({
+        gallery: gallery._id,
+        deletedAt: null,
+        isVideo: false,
+        "aiAnalysis.suggested": true,
+        rejectedByClient: { $ne: true },
+    }).sort({ "aiAnalysis.suggestionScore": -1, sortOrder: 1, createdAt: 1 })
+
+    if (requestedIds?.length) {
+        const idSet = new Set(requestedIds)
+        candidates = candidates.filter((p) => idSet.has(String(p._id)))
+    }
+
+    if (replaceExisting) {
+        await GalleryPhoto.updateMany(
+            galleryClientSelectionPhotoFilter(gallery._id),
+            { $set: { selectedByClient: false, selectedAt: null } }
+        )
+    }
+
+    const currentCount = replaceExisting
+        ? 0
+        : await GalleryPhoto.countDocuments(
+              galleryClientSelectionPhotoFilter(gallery._id)
+          )
+
+    const limit =
+        gallery.maxSelections != null
+            ? Math.max(0, gallery.maxSelections - currentCount)
+            : candidates.length
+
+    const toSelect = candidates.slice(0, limit)
+    const now = new Date()
+
+    if (toSelect.length > 0) {
+        await GalleryPhoto.updateMany(
+            { _id: { $in: toSelect.map((p) => p._id) } },
+            { $set: { selectedByClient: true, selectedAt: now } }
+        )
+    }
+
+    scheduleGalleryPhotosReindex(gallery._id)
+
+    const selected = await GalleryPhoto.find(
+        galleryClientSelectionPhotoFilter(gallery._id)
+    ).sort(galleryClientSelectionPhotoSort)
+
+    const photoOptions = {
+        absoluteUrls: true,
+        watermarkPreviewEnabled: gallery.watermarkPreviewEnabled === true,
+    }
+
+    if (gallery.status === "draft") {
+        gallery.status = "selecting"
+        await gallery.save()
+    }
+
+    return res.status(200).json({
+        message: "AI suggestions applied",
+        appliedCount: toSelect.length,
+        selectionLimit: gallery.maxSelections ?? null,
+        selectionsUsed: selected.length,
+        selectionsRemaining:
+            gallery.maxSelections != null
+                ? Math.max(0, gallery.maxSelections - selected.length)
+                : null,
+        photos: selected.map((p) => formatPublicGalleryPhotoResponse(p, photoOptions)),
+    })
+}
+
+export const applyPublicAiSuggestions = (req, res) =>
+    handlePublicMutation(req, res, ({ gallery }, req, res) =>
+        applyAiSuggestionsForGallery(gallery, req, res)
+    )
+
+async function toggleRejectForGallery(gallery, req, res) {
+    if (!canEditSelections(gallery)) {
+        return selectionLockedResponse(res)
+    }
+
+    const photoId = req.body?.photoId ?? req.body?.photo_id
+    if (!photoId) {
+        return res.status(400).json({ message: "photoId is required" })
+    }
+
+    const photo = await loadPublicPhoto(gallery, photoId)
+    if (!photo) {
+        return res.status(404).json({ message: "Photo not found" })
+    }
+
+    const comment =
+        req.body?.comment !== undefined
+            ? String(req.body.comment).trim()
+            : undefined
+
+    if (photo.rejectedByClient) {
+        photo.rejectedByClient = false
+        photo.rejectedAt = null
+        if (comment !== undefined && comment) {
+            photo.rejectionComment = comment
+        }
+    } else {
+        photo.rejectedByClient = true
+        photo.rejectedAt = new Date()
+        if (comment !== undefined) {
+            photo.rejectionComment = comment
+        }
+        if (photo.selectedByClient) {
+            photo.selectedByClient = false
+            photo.selectedAt = null
+        }
+    }
+
+    await photo.save()
+    scheduleGalleryPhotoIndex(photo)
+
+    loadGalleryAiSuggestions(gallery._id, {
+        maxSelections: gallery.maxSelections ?? null,
+    }).catch((err) => {
+        console.error("toggleReject refresh suggestions:", err)
+    })
+
+    return res.status(200).json({
+        photo: formatPublicGalleryPhotoResponse(photo, {
+            absoluteUrls: true,
+            watermarkPreviewEnabled: gallery.watermarkPreviewEnabled === true,
+        }),
+    })
+}
+
+export const togglePublicReject = (req, res) =>
+    handlePublicMutation(req, res, ({ gallery }, req, res) =>
+        toggleRejectForGallery(gallery, req, res)
     )
 
 async function loadPublicFinal(gallery, finalId) {

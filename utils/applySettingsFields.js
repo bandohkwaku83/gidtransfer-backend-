@@ -13,6 +13,7 @@ import {
     ensureUserCompanySlug,
 } from "./gallerySlugHelpers.js"
 import { applySmsSenderIdToStudio } from "./applySmsSenderFields.js"
+import { applyPhotographerEmailChange } from "./applyStudioFields.js"
 
 export const applySettingsFieldsToUser = async (
     user,
@@ -22,6 +23,11 @@ export const applySettingsFieldsToUser = async (
     const studio = user.studio ?? {}
     const previousLogoUrl = studio.logoUrl || ""
     const previousAvatarUrl = user.avatarUrl || ""
+    let emailChanged = false
+
+    if (fields.email !== undefined) {
+        emailChanged = await applyPhotographerEmailChange(user, fields.email)
+    }
 
     if (fields.companyName !== undefined) {
         studio.companyName = fields.companyName
@@ -122,5 +128,5 @@ export const applySettingsFieldsToUser = async (
         user.onboardingCompletedAt = user.onboardingCompletedAt ?? new Date()
     }
 
-    return user
+    return { user, emailChanged }
 }

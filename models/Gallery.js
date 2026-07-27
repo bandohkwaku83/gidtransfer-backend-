@@ -283,6 +283,28 @@ const gallerySchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
+        /**
+         * Client-controlled AI suggestion run on the public gallery.
+         * idle → running ↔ paused → terminated (or back to idle after terminate).
+         */
+        aiSuggestionRunStatus: {
+            type: String,
+            enum: ["idle", "running", "paused", "terminated"],
+            default: "idle",
+            index: true,
+        },
+        aiSuggestionRunStartedAt: {
+            type: Date,
+            default: null,
+        },
+        aiSuggestionRunPausedAt: {
+            type: Date,
+            default: null,
+        },
+        aiSuggestionRunTerminatedAt: {
+            type: Date,
+            default: null,
+        },
         /** When false, the Finals tab is hidden from the client gallery. */
         finalDeliveryEnabled: {
             type: Boolean,

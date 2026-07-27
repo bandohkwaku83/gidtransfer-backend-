@@ -20,6 +20,7 @@ import {
     uploadBuffer,
     headObject,
     deleteObjects,
+    deleteObjectsByPrefix,
 } from "./s3Storage.js"
 
 export const MAX_GALLERY_FINAL_BYTES = MAX_GALLERY_VIDEO_BYTES
@@ -92,6 +93,38 @@ export const deleteGalleryFinalFile = (galleryId, storedFilename) => {
         if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath)
     } catch {
         /* ignore */
+    }
+}
+
+/** Remove final original plus DASH/poster companions when present. */
+export const deleteGalleryFinalAssets = (galleryId, finalDoc) => {
+    if (!galleryId || !finalDoc) return
+    deleteGalleryFinalFile(galleryId, finalDoc.storedFilename)
+    if (finalDoc.posterStoredFilename) {
+        deleteGalleryFinalFile(galleryId, finalDoc.posterStoredFilename)
+    }
+
+    const dashManifest = finalDoc.dashManifestStoredFilename
+    if (dashManifest || finalDoc.isVideo === true) {
+        const dashDir = dashManifest
+            ? path.posix.dirname(dashManifest)
+            : finalDoc.storedFilename
+              ? `${path.parse(finalDoc.storedFilename).name}-dash`
+              : null
+        if (!dashDir || dashDir === ".") return
+
+        if (s3Configured()) {
+            deleteObjectsByPrefix(galleryFinalObjectKey(galleryId, dashDir))
+        } else {
+            const dir = path.join(GALLERY_FINALS_DIR, String(galleryId), dashDir)
+            try {
+                if (fs.existsSync(dir)) {
+                    fs.rmSync(dir, { recursive: true, force: true })
+                }
+            } catch {
+                /* ignore */
+            }
+        }
     }
 }
 
@@ -175,4 +208,9 @@ export const verifyGalleryFinalInStorage = async ({
         if (stat.size !== sizeBytes) return "Uploaded file size does not match"
     }
     return null
+}
+
+export const galleryFinalStoragePath = (galleryId, storedFilename) => {
+    if (s3Configured()) return null
+    return path.join(GALLERY_FINALS_DIR, String(galleryId), storedFilename)
 }

@@ -16,6 +16,11 @@ const handleSettingsError = (res, error) => {
     if (error.statusCode === 400 || error.statusCode === 409) {
         return res.status(error.statusCode).json({ message: error.message })
     }
+    if (error.code === 11000) {
+        return res
+            .status(409)
+            .json({ message: "An account with this email already exists" })
+    }
     console.error("Settings error:", error)
     return res.status(500).json({ message: "Server error" })
 }
@@ -61,9 +66,13 @@ export const updateSettings = async (req, res) => {
             }
         }
 
-        await applySettingsFieldsToUser(req.user, fields ?? {}, {
-            ...settingsUploadedFiles(req),
-        })
+        const { emailChanged } = await applySettingsFieldsToUser(
+            req.user,
+            fields ?? {},
+            {
+                ...settingsUploadedFiles(req),
+            }
+        )
         await req.user.save()
         await ensureUserAccountId(req.user)
 
@@ -75,14 +84,25 @@ export const updateSettings = async (req, res) => {
             getOwnerStorageBreakdown(req.user._id),
         ])
 
+        const user = formatUserResponse(req.user)
+        const requiresEmailVerification =
+            emailChanged &&
+            req.user.authProvider === "email" &&
+            !user.emailVerified
+
         return res.status(200).json({
-            message: "Profile saved",
+            message: requiresEmailVerification
+                ? "Profile saved. Check your inbox to verify the new email."
+                : "Profile saved",
             settings: formatSettingsResponse({
                 user: req.user,
                 galleryCount,
                 storageUsedBytes: storageBreakdown.totalBytes,
             }),
-            user: formatUserResponse(req.user),
+            user,
+            ...(requiresEmailVerification
+                ? { requiresEmailVerification: true }
+                : {}),
         })
     } catch (error) {
         return handleSettingsError(res, error)

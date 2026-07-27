@@ -47,6 +47,10 @@ export const parseWebsite = (value) => {
     return { value: normalized }
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const isTruthyFlag = (value) =>
+    value === true || value === "true" || value === "1" || value === 1
+
 export const parseSettingsInput = (body, { partial = true } = {}) => {
     const companyName = (
         body.companyName ??
@@ -70,10 +74,27 @@ export const parseSettingsInput = (body, { partial = true } = {}) => {
         body.sms_sender_id ??
         body.smsDisplayName ??
         body.sms_display_name
-    const logoRaw = body.logoDataUrl ?? body.logo_data_url
+    const emailRaw =
+        body.email ?? body.photographerEmail ?? body.photographer_email
+    const logoRaw =
+        body.logoDataUrl ??
+        body.logo_data_url ??
+        body.brandLogoDataUrl ??
+        body.brand_logo_data_url
     const avatarRaw = body.avatarDataUrl ?? body.avatar_data_url
     const errors = []
     const fields = {}
+
+    if (emailRaw !== undefined && emailRaw !== null) {
+        const normalizedEmail = String(emailRaw).trim().toLowerCase()
+        if (!normalizedEmail) {
+            errors.push("Photographer email is required")
+        } else if (!EMAIL_REGEX.test(normalizedEmail)) {
+            errors.push("A valid photographer email is required")
+        } else {
+            fields.email = normalizedEmail
+        }
+    }
 
     if (companyName !== undefined && (companyName || !partial)) {
         if (!companyName && !partial) {
@@ -131,7 +152,11 @@ export const parseSettingsInput = (body, { partial = true } = {}) => {
         } else if (logoResult.value) {
             fields.logoDataUrl = logoResult.value
         }
-    } else if (body.clearLogo === true || body.clearLogo === "true") {
+    } else if (
+        isTruthyFlag(body.clearLogo) ||
+        isTruthyFlag(body.clearBrandLogo) ||
+        isTruthyFlag(body.clear_brand_logo)
+    ) {
         fields.logoDataUrl = ""
         fields.clearLogo = true
     }

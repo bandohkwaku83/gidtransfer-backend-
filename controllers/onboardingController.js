@@ -4,9 +4,14 @@ import { parseStudioInput } from "../utils/studioFields.js"
 
 const handleStudioError = (res, error) => {
     if (error.code === 11000) {
-        return res
-            .status(409)
-            .json({ message: "This SMS display name is already taken" })
+        const isEmail =
+            error.keyPattern?.email ||
+            String(error.message || "").includes("email")
+        return res.status(409).json({
+            message: isEmail
+                ? "An account with this email already exists"
+                : "This SMS display name is already taken",
+        })
     }
     if (error.statusCode === 400 || error.statusCode === 409) {
         return res.status(error.statusCode).json({ message: error.message })
@@ -61,15 +66,26 @@ export const updateStudio = async (req, res) => {
             return res.status(400).json({ message: "Country is required" })
         }
 
-        await applyStudioFieldsToUser(req.user, fields, {
+        const { emailChanged } = await applyStudioFieldsToUser(req.user, fields, {
             uploadedFile: req.file,
             partial: true,
         })
         await req.user.save()
 
+        const user = formatUserResponse(req.user)
+        const requiresEmailVerification =
+            emailChanged &&
+            req.user.authProvider === "email" &&
+            !user.emailVerified
+
         return res.status(200).json({
-            message: "Studio profile updated",
-            user: formatUserResponse(req.user),
+            message: requiresEmailVerification
+                ? "Studio profile updated. Check your inbox to verify the new email."
+                : "Studio profile updated",
+            user,
+            ...(requiresEmailVerification
+                ? { requiresEmailVerification: true }
+                : {}),
         })
     } catch (error) {
         return handleStudioError(res, error)

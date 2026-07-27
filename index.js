@@ -41,6 +41,10 @@ import { paystackConfigured } from "./services/paystack.js"
 import { s3Configured, s3PublicReadsViaDirectUrl } from "./utils/s3Storage.js"
 import { createS3UploadsMiddleware } from "./utils/s3UploadsMiddleware.js"
 import { startBookingReminderScheduler } from "./jobs/bookingReminderJob.js"
+import { ffmpegAvailable, resolveFfmpegPath } from "./utils/ffmpeg.js"
+import { galleryVideoDashEnabled } from "./utils/galleryVideoDash.js"
+import { galleryThumbMaxPx } from "./utils/previewWatermark.js"
+import { initOpensearch, opensearchEnabled } from "./utils/opensearch.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const uploadsDir = path.join(__dirname, "uploads")
@@ -108,6 +112,44 @@ if (s3Configured()) {
 } else {
     console.warn(
         "Object storage (S3): disabled — gallery uploads use local disk. Set S3_BUCKET, AWS_REGION, and AWS credentials for direct-to-S3 uploads."
+    )
+}
+
+{
+    const thumbPx = galleryThumbMaxPx()
+    if (thumbPx > 0) {
+        console.log(
+            `Gallery images: progressive JPEG thumbs enabled (max ${thumbPx}px)`
+        )
+    } else {
+        console.log(
+            "Gallery images: progressive JPEG thumbs disabled (GALLERY_THUMB_MAX_PX=0)"
+        )
+    }
+}
+
+if (galleryVideoDashEnabled()) {
+    const hasFfmpeg = await ffmpegAvailable()
+    if (hasFfmpeg) {
+        console.log(
+            `Gallery video DASH: enabled (ffmpeg: ${resolveFfmpegPath()})`
+        )
+    } else {
+        console.warn(
+            `Gallery video DASH: enabled but ffmpeg not found (${resolveFfmpegPath()}). Install FFmpeg or set FFMPEG_PATH; packaging will be skipped.`
+        )
+    }
+} else {
+    console.log("Gallery video DASH: disabled (GALLERY_VIDEO_DASH_ENABLED=false)")
+}
+
+if (opensearchEnabled()) {
+    console.log(
+        `OpenSearch: enabled (${process.env.OPENSEARCH_NODE?.trim() || "node unset"})`
+    )
+} else {
+    console.log(
+        "OpenSearch: disabled — search uses Mongo. Set OPENSEARCH_NODE to enable."
     )
 }
 
@@ -198,8 +240,9 @@ app.get("/api", (_req, res) => {
             onboarding: {
                 get: "GET /api/onboarding",
                 complete:
-                    "POST /api/onboarding (multipart: companyName, companySlug, phone, primaryDeliverable, country, smsSenderId; optional referralCode, logo)",
-                update: "PUT /api/onboarding",
+                    "POST /api/onboarding (multipart: companyName, companySlug, phone, primaryDeliverable, country, smsSenderId; optional referralCode, email, logo|brandLogo)",
+                update:
+                    "PUT /api/onboarding (partial; optional email|photographerEmail, logo|brandLogo, clearBrandLogo)",
             },
             sms: {
                 config: "GET /api/sms/config",
@@ -253,7 +296,7 @@ app.get("/api", (_req, res) => {
             settings: {
                 get: "GET /api/settings",
                 update:
-                    "PUT /api/settings (multipart: businessName, companySlug, phone, website; optional logo, avatar, emailNotifications, clearLogo, clearAvatar)",
+                    "PUT /api/settings (multipart: businessName, companySlug, phone, website, email|photographerEmail; optional logo|brandLogo, avatar, emailNotifications, clearLogo|clearBrandLogo, clearAvatar)",
                 profile: "GET /api/settings/profile",
                 overview: "GET /api/settings/overview",
                 studio: "GET /api/settings/studio",
@@ -353,7 +396,7 @@ app.get("/api", (_req, res) => {
                 finalSettings:
                     "PATCH /api/galleries/:id/final-settings (watermarkFinalsEnabled)",
                 uploads: {
-                    list: "GET /api/galleries/:id/uploads (ordered by sortOrder)",
+                    list: "GET /api/galleries/:id/uploads?q=&scene=&tag=&suggested=&blurry=&eyesOpen=&minQuality=&page=&limit= (search uses OpenSearch when enabled)",
                     reorder:
                         "PATCH /api/galleries/:id/uploads/reorder (body: photoIds[])",
                     presign:
@@ -403,6 +446,8 @@ app.get("/api", (_req, res) => {
                 unlock: "POST /api/public/:companySlug/:gallerySlug/unlock",
                 select: "POST /api/public/:companySlug/:gallerySlug/select",
                 comment: "POST /api/public/:companySlug/:gallerySlug/comment",
+                searchPhotos:
+                    "GET /api/public/:companySlug/:gallerySlug/photos/search?q=&scene=&tag=&suggested=&blurry=&minQuality=",
                 flagFinal:
                     "POST /api/public/:companySlug/:gallerySlug/finals/:finalId/flag",
                 updateFinalComment:
@@ -501,6 +546,19 @@ mongoose
                 "Gallery.syncIndexes failed (you may fix indexes manually):",
                 err.message
             )
+        }
+
+        try {
+            const osInit = await initOpensearch()
+            if (osInit.enabled) {
+                console.log("OpenSearch indices ready")
+            } else if (opensearchEnabled()) {
+                console.warn(
+                    `OpenSearch init skipped/failed: ${osInit.error ?? "unknown"}`
+                )
+            }
+        } catch (err) {
+            console.warn("[opensearch] boot init:", err.message)
         }
 
         try {

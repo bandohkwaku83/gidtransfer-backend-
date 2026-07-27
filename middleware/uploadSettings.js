@@ -15,9 +15,11 @@ const upload = multer({
     },
 })
 
-/** Multipart form-data: text fields + optional `logo` and/or `avatar` files. */
+/** Multipart form-data: text fields + optional logo/brandLogo and/or avatar. */
 export const uploadSettingsMedia = upload.fields([
     { name: "logo", maxCount: 1 },
+    { name: "brandLogo", maxCount: 1 },
+    { name: "brand_logo", maxCount: 1 },
     { name: "avatar", maxCount: 1 },
 ])
 
@@ -31,7 +33,8 @@ export const handleUploadSettings = (req, res, next) => {
         }
         if (err.code === "LIMIT_UNEXPECTED_FILE") {
             return res.status(400).json({
-                message: "Only logo and avatar file uploads are allowed",
+                message:
+                    "Only logo, brandLogo, and avatar file uploads are allowed",
             })
         }
         return res.status(400).json({
@@ -41,6 +44,10 @@ export const handleUploadSettings = (req, res, next) => {
 }
 
 export const settingsUploadedFiles = (req) => ({
-    uploadedLogo: req.files?.logo?.[0] ?? null,
+    uploadedLogo:
+        req.files?.logo?.[0] ??
+        req.files?.brandLogo?.[0] ??
+        req.files?.brand_logo?.[0] ??
+        null,
     uploadedAvatar: req.files?.avatar?.[0] ?? null,
 })

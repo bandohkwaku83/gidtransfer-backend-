@@ -2,8 +2,10 @@ import {
     S3Client,
     PutObjectCommand,
     DeleteObjectCommand,
+    DeleteObjectsCommand,
     HeadObjectCommand,
     GetObjectCommand,
+    ListObjectsV2Command,
 } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 
@@ -177,4 +179,36 @@ export const deleteObject = async (key) => {
 export const deleteObjects = async (keys) => {
     const unique = [...new Set(keys.filter(Boolean))]
     await Promise.all(unique.map((key) => deleteObject(key)))
+}
+
+/** Delete every object under a key prefix (paginated). */
+export const deleteObjectsByPrefix = async (prefix) => {
+    const client = getS3Client()
+    if (!client || !prefix) return
+
+    let continuationToken
+    do {
+        const listed = await client.send(
+            new ListObjectsV2Command({
+                Bucket: s3Bucket(),
+                Prefix: prefix.endsWith("/") ? prefix : `${prefix}/`,
+                ContinuationToken: continuationToken,
+            })
+        )
+        const keys = (listed.Contents ?? []).map((obj) => obj.Key).filter(Boolean)
+        if (keys.length) {
+            await client.send(
+                new DeleteObjectsCommand({
+                    Bucket: s3Bucket(),
+                    Delete: {
+                        Objects: keys.map((Key) => ({ Key })),
+                        Quiet: true,
+                    },
+                })
+            )
+        }
+        continuationToken = listed.IsTruncated
+            ? listed.NextContinuationToken
+            : undefined
+    } while (continuationToken)
 }

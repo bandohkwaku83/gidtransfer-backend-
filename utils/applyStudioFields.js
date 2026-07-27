@@ -1,3 +1,4 @@
+import User from "../models/User.js"
 import {
     deleteStudioLogoFile,
     saveStudioLogoFile,
@@ -8,6 +9,63 @@ import {
     ensureUserCompanySlug,
 } from "./gallerySlugHelpers.js"
 import { applySmsSenderIdToStudio } from "./applySmsSenderFields.js"
+import {
+    createEmailVerificationOtp,
+    EMAIL_VERIFICATION_EXPIRY_MS,
+} from "./emailVerification.js"
+import { sendEmailVerificationOtp } from "./photographerNotifications.js"
+
+const assertEmailAvailable = async (email, { excludeUserId } = {}) => {
+    const filter = { email }
+    if (excludeUserId) {
+        filter._id = { $ne: excludeUserId }
+    }
+    const existing = await User.findOne(filter).select("_id")
+    if (existing) {
+        const err = new Error("An account with this email already exists")
+        err.statusCode = 409
+        throw err
+    }
+}
+
+/** @returns {Promise<boolean>} true when the login email changed */
+export const applyPhotographerEmailChange = async (user, nextEmail) => {
+    const current = user.email?.trim().toLowerCase() || ""
+    if (!nextEmail || nextEmail === current) return false
+
+    await assertEmailAvailable(nextEmail, { excludeUserId: user._id })
+    user.email = nextEmail
+
+    // Re-verify when the login identity changes for email/password accounts.
+    if (user.authProvider === "email") {
+        user.emailVerifiedAt = undefined
+        const { code, hash } = createEmailVerificationOtp()
+        user.emailVerificationOtpHash = hash
+        user.emailVerificationExpires = new Date(
+            Date.now() + EMAIL_VERIFICATION_EXPIRY_MS
+        )
+        user.emailVerificationSentAt = new Date()
+        try {
+            const result = await sendEmailVerificationOtp({
+                email: nextEmail,
+                code,
+            })
+            if (result?.dryRun && process.env.NODE_ENV !== "production") {
+                console.log(`[email-verification] ${nextEmail}: ${code}`)
+            }
+        } catch (error) {
+            console.error(
+                `[email-verification] email failed for ${nextEmail}:`,
+                error?.message || error
+            )
+            if (process.env.NODE_ENV !== "production") {
+                console.log(`[email-verification] ${nextEmail}: ${code}`)
+            }
+        }
+    }
+
+    return true
+}
 
 export const applyStudioFieldsToUser = async (
     user,
@@ -16,6 +74,11 @@ export const applyStudioFieldsToUser = async (
 ) => {
     const studio = user.studio ?? {}
     const previousLogoUrl = studio.logoUrl || ""
+    let emailChanged = false
+
+    if (fields.email !== undefined) {
+        emailChanged = await applyPhotographerEmailChange(user, fields.email)
+    }
 
     if (fields.companyName !== undefined) {
         studio.companyName = fields.companyName
@@ -89,5 +152,5 @@ export const applyStudioFieldsToUser = async (
         user.onboardingCompletedAt = user.onboardingCompletedAt ?? new Date()
     }
 
-    return user
+    return { user, emailChanged }
 }

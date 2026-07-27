@@ -46,6 +46,7 @@ const processJob = async (job) => {
                 },
             }
         )
+        // AI analysis starts only when the client calls start — not on upload.
     } catch (err) {
         console.error("galleryDerivativeQueue: failed for photo", photoId, err)
     }

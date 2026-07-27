@@ -17,6 +17,7 @@ import {
 } from "./galleryPhotoStorage.js"
 import { galleryFinalPublicUrl } from "./galleryFinalStorage.js"
 import { photoDerivativesReady } from "./galleryDerivativeQueue.js"
+import { videoStreamingReady } from "./galleryVideoQueue.js"
 import { formatFeedbackResponse } from "./feedbackThread.js"
 import {
     formatGalleryClientAccessResponse,
@@ -195,7 +196,7 @@ export async function resolveGallerySetIdForUpload(galleryId, body) {
 
 export const formatGalleryPhotoResponse = (
     doc,
-    { absoluteUrls = false, watermarkPreviewEnabled = false } = {}
+    { absoluteUrls = false, watermarkPreviewEnabled = false, includeAi = false } = {}
 ) => {
     const p = doc.toObject?.() ?? doc
     const galleryId = String(p.gallery)
@@ -215,9 +216,17 @@ export const formatGalleryPhotoResponse = (
     const displayRelative = p.previewWmStoredFilename
         ? galleryPhotoPublicUrl(galleryId, p.previewWmStoredFilename)
         : undefined
+    const posterRelative = p.posterStoredFilename
+        ? galleryPhotoPublicUrl(galleryId, p.posterStoredFilename)
+        : undefined
+    const dashRelative = p.dashManifestStoredFilename
+        ? galleryPhotoPublicUrl(galleryId, p.dashManifestStoredFilename)
+        : undefined
 
     const thumbUrl = resolve(thumbRelative)
     const displayUrl = displayRelative ? resolve(displayRelative) : undefined
+    const posterUrl = posterRelative ? resolve(posterRelative) : undefined
+    const dashUrl = dashRelative ? resolve(dashRelative) : undefined
 
     const response = {
         id: p._id ?? p.id,
@@ -228,11 +237,15 @@ export const formatGalleryPhotoResponse = (
         sizeBytes: p.sizeBytes,
         isVideo: p.isVideo === true,
         derivativesReady: photoDerivativesReady(p),
+        streamingReady: videoStreamingReady(p),
+        dashStatus: p.dashStatus ?? null,
         setId: p.set ? String(p.set) : null,
         sortOrder: typeof p.sortOrder === "number" ? p.sortOrder : 0,
         deletedAt: p.deletedAt ?? null,
         restoreDeadline: p.restoreDeadline ?? null,
         selectedByClient: p.selectedByClient === true,
+        rejectedByClient: p.rejectedByClient === true,
+        rejectedAt: p.rejectedAt ?? null,
         ...formatFeedbackResponse(p),
         selectedAt: p.selectedAt ?? null,
         createdAt: p.createdAt,
@@ -241,12 +254,20 @@ export const formatGalleryPhotoResponse = (
 
     if (thumbUrl) response.thumbUrl = thumbUrl
     if (displayUrl) response.displayUrl = displayUrl
+    if (posterUrl) response.posterUrl = posterUrl
+    if (dashUrl) response.dashUrl = dashUrl
 
     // gridUrl / viewUrl always point at full-resolution originals unless a
     // watermarked client preview is explicitly enabled for viewUrl.
-    response.gridUrl = url
+    // Videos prefer poster for grid when available.
+    response.gridUrl = posterUrl && p.isVideo === true ? posterUrl : url
     response.viewUrl =
         watermarkPreviewEnabled && displayUrl ? displayUrl : url
+
+    if (includeAi) {
+        const ai = formatPublicGalleryPhotoAiResponse(doc)
+        if (ai) response.ai = ai
+    }
 
     return response
 }
@@ -263,12 +284,39 @@ export const formatGalleryPhotoGridResponse = (
         originalFilename: full.originalFilename,
         url: full.url,
         thumbUrl: full.thumbUrl,
+        posterUrl: full.posterUrl,
+        dashUrl: full.dashUrl,
         gridUrl: full.gridUrl,
         viewUrl: full.viewUrl,
         sortOrder: full.sortOrder,
         setId: full.setId,
         isVideo: full.isVideo,
         derivativesReady: full.derivativesReady,
+        streamingReady: full.streamingReady,
+        dashStatus: full.dashStatus,
+    }
+}
+
+/** Client-facing AI selection hints (public gallery only). */
+export const formatPublicGalleryPhotoAiResponse = (doc) => {
+    const p = doc.toObject?.() ?? doc
+    const ai = p.aiAnalysis ?? {}
+    if (!ai.status) return null
+
+    return {
+        status: ai.status,
+        suggested: ai.suggested === true,
+        qualityScore: ai.qualityScore ?? null,
+        sceneLabel: ai.sceneLabel ?? null,
+        tags: Array.isArray(ai.tags) ? ai.tags : [],
+        issues: Array.isArray(ai.issues) ? ai.issues : [],
+        faceCount: ai.faceCount ?? null,
+        eyesOpen: ai.eyesOpen ?? null,
+        isBlurry: ai.isBlurry === true,
+        duplicateGroupId: ai.duplicateGroupId ?? null,
+        isBestInGroup: ai.isBestInGroup !== false,
+        suggestionScore: ai.suggestionScore ?? null,
+        suggestionReason: ai.suggestionReason ?? null,
     }
 }
 
@@ -281,15 +329,17 @@ export const formatPublicGalleryPhotoResponse = (
         absoluteUrls,
         watermarkPreviewEnabled,
     })
+    const ai = formatPublicGalleryPhotoAiResponse(doc)
+    const withAi = ai ? { ...base, ai } : base
     if (base.selectedByClient && base.deletedAt) {
         return {
-            ...base,
+            ...withAi,
             removedFromBrowse: true,
             deletedAt: null,
             restoreDeadline: null,
         }
     }
-    return base
+    return withAi
 }
 
 export const formatGalleryFinalResponse = (doc, { absoluteUrls = false } = {}) => {
@@ -299,6 +349,20 @@ export const formatGalleryFinalResponse = (doc, { absoluteUrls = false } = {}) =
         ? galleryFinalPublicUrl(galleryId, p.storedFilename)
         : p.url
     const url = absoluteUrls ? resolveMediaUrl(relativeUrl) : relativeUrl
+    const resolve = (relativePath) => {
+        if (!relativePath?.trim()) return undefined
+        return absoluteUrls ? resolveMediaUrl(relativePath) : relativePath
+    }
+    const posterUrl = resolve(
+        p.posterStoredFilename
+            ? galleryFinalPublicUrl(galleryId, p.posterStoredFilename)
+            : undefined
+    )
+    const dashUrl = resolve(
+        p.dashManifestStoredFilename
+            ? galleryFinalPublicUrl(galleryId, p.dashManifestStoredFilename)
+            : undefined
+    )
     return {
         id: p._id ?? p.id,
         galleryId: String(p.gallery),
@@ -307,6 +371,10 @@ export const formatGalleryFinalResponse = (doc, { absoluteUrls = false } = {}) =
         mimeType: p.mimeType,
         sizeBytes: p.sizeBytes,
         isVideo: p.isVideo === true,
+        streamingReady: videoStreamingReady(p),
+        dashStatus: p.dashStatus ?? null,
+        ...(posterUrl ? { posterUrl } : {}),
+        ...(dashUrl ? { dashUrl } : {}),
         setId: p.set ? String(p.set) : null,
         sortOrder: typeof p.sortOrder === "number" ? p.sortOrder : 0,
         deletedAt: p.deletedAt ?? null,

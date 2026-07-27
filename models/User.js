@@ -49,13 +49,14 @@ const studioSchema = new mongoose.Schema(
             trim: true,
             default: "",
         },
-        /** Arkesel sender ID shown on outbound SMS (max 11 alphanumeric). */
+        /** Arkesel sender ID shown on outbound SMS (max 11 alphanumeric). Used on send as soon as set. */
         smsSenderId: {
             type: String,
             trim: true,
             default: "",
             uppercase: true,
         },
+        /** `approved` once set by the studio; `rejected` only if admin blocks it. */
         smsSenderStatus: {
             type: String,
             enum: ["none", "pending", "approved", "rejected"],

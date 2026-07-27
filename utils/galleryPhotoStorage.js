@@ -20,6 +20,7 @@ import {
     uploadBuffer,
     headObject,
     deleteObjects,
+    deleteObjectsByPrefix,
 } from "./s3Storage.js"
 
 export const MAX_GALLERY_PHOTO_BYTES = MAX_GALLERY_VIDEO_BYTES
@@ -92,7 +93,7 @@ export const deleteGalleryPhotoFile = (galleryId, storedFilename) => {
     }
 }
 
-/** Remove original plus any known preview/thumbnail derivatives. */
+/** Remove original plus any known preview/thumbnail/DASH derivatives. */
 export const deleteGalleryPhotoAssets = (galleryId, photo) => {
     if (!galleryId || !photo) return
     deleteGalleryPhotoFile(galleryId, photo.storedFilename)
@@ -101,6 +102,32 @@ export const deleteGalleryPhotoAssets = (galleryId, photo) => {
     }
     if (photo.previewWmStoredFilename) {
         deleteGalleryPhotoFile(galleryId, photo.previewWmStoredFilename)
+    }
+    if (photo.posterStoredFilename) {
+        deleteGalleryPhotoFile(galleryId, photo.posterStoredFilename)
+    }
+
+    const dashManifest = photo.dashManifestStoredFilename
+    if (dashManifest || photo.isVideo === true) {
+        const dashDir = dashManifest
+            ? path.posix.dirname(dashManifest)
+            : photo.storedFilename
+              ? `${path.parse(photo.storedFilename).name}-dash`
+              : null
+        if (!dashDir || dashDir === ".") return
+
+        if (s3Configured()) {
+            deleteObjectsByPrefix(galleryPhotoObjectKey(galleryId, dashDir))
+        } else {
+            const dir = path.join(GALLERY_PHOTOS_DIR, String(galleryId), dashDir)
+            try {
+                if (fs.existsSync(dir)) {
+                    fs.rmSync(dir, { recursive: true, force: true })
+                }
+            } catch {
+                /* ignore */
+            }
+        }
     }
 }
 

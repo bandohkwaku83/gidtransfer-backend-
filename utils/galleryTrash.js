@@ -7,9 +7,15 @@ import GallerySet from "../models/GallerySet.js"
 import { deleteGalleryCoverFile } from "./galleryCoverStorage.js"
 import { deleteGalleryMusicFile } from "./galleryMusicStorage.js"
 import { deleteGalleryPhotoAssets, GALLERY_PHOTOS_DIR } from "./galleryPhotoStorage.js"
-import { deleteGalleryFinalFile, GALLERY_FINALS_DIR } from "./galleryFinalStorage.js"
+import { deleteGalleryFinalAssets, GALLERY_FINALS_DIR } from "./galleryFinalStorage.js"
 import { clearShareCoverSnapshot } from "./galleryShareCover.js"
 import { galleryOwnerFilter, galleryTrashedOnlyFilter } from "./galleryFields.js"
+import {
+    deleteGalleryPhotosFromOpensearchByGallery,
+    scheduleGalleryPhotoDelete,
+} from "./opensearchPhotos.js"
+import { scheduleStudioGalleryDelete } from "./opensearchStudio.js"
+import { opensearchSafe } from "./opensearch.js"
 
 export const GALLERY_TRASH_RETENTION_DAYS = 30
 export const GALLERY_TRASH_RETENTION_MS = GALLERY_TRASH_RETENTION_DAYS * 86_400_000
@@ -51,16 +57,22 @@ export async function permanentlyDeleteGallery(galleryDoc) {
 
     const [photos, finals] = await Promise.all([
         GalleryPhoto.find({ gallery: galleryId })
-            .select("storedFilename thumbStoredFilename previewWmStoredFilename")
+            .select(
+                "storedFilename thumbStoredFilename previewWmStoredFilename posterStoredFilename dashManifestStoredFilename isVideo"
+            )
             .exec(),
-        GalleryFinal.find({ gallery: galleryId }).select("storedFilename").exec(),
+        GalleryFinal.find({ gallery: galleryId })
+            .select(
+                "storedFilename posterStoredFilename dashManifestStoredFilename isVideo"
+            )
+            .exec(),
     ])
 
     for (const photo of photos) {
         deleteGalleryPhotoAssets(galleryId, photo)
     }
     for (const final of finals) {
-        deleteGalleryFinalFile(galleryId, final.storedFilename)
+        deleteGalleryFinalAssets(galleryId, final)
     }
 
     await Promise.all([
@@ -70,20 +82,27 @@ export async function permanentlyDeleteGallery(galleryDoc) {
         Gallery.deleteOne({ _id: galleryId }),
     ])
 
+    scheduleStudioGalleryDelete(galleryId)
+    opensearchSafe("delete gallery photos", () =>
+        deleteGalleryPhotosFromOpensearchByGallery(galleryId)
+    )
+
     removeDirIfEmpty(path.join(GALLERY_PHOTOS_DIR, galleryId))
     removeDirIfEmpty(path.join(GALLERY_FINALS_DIR, galleryId))
 }
 
 export async function permanentlyDeleteGalleryPhoto(photoDoc) {
     const galleryId = String(photoDoc.gallery)
+    const photoId = photoDoc._id
     deleteGalleryPhotoAssets(galleryId, photoDoc)
-    await GalleryPhoto.deleteOne({ _id: photoDoc._id })
+    await GalleryPhoto.deleteOne({ _id: photoId })
+    scheduleGalleryPhotoDelete(photoId)
     removeDirIfEmpty(path.join(GALLERY_PHOTOS_DIR, galleryId))
 }
 
 export async function permanentlyDeleteGalleryFinal(finalDoc) {
     const galleryId = String(finalDoc.gallery)
-    deleteGalleryFinalFile(galleryId, finalDoc.storedFilename)
+    deleteGalleryFinalAssets(galleryId, finalDoc)
     await GalleryFinal.deleteOne({ _id: finalDoc._id })
     removeDirIfEmpty(path.join(GALLERY_FINALS_DIR, galleryId))
 }

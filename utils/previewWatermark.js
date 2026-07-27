@@ -16,13 +16,14 @@ import {
 
 const parseThumbMaxPx = () => {
     const raw = process.env.GALLERY_THUMB_MAX_PX?.trim()
-    if (raw === undefined || raw === "") return 0
+    // Default on (1200) for progressive JPEG grid delivery; set 0 to disable.
+    if (raw === undefined || raw === "") return 1200
     const n = Number(raw)
     if (!Number.isFinite(n) || n <= 0) return 0
     return Math.max(320, Math.floor(n))
 }
 
-/** Optional grid thumbnails — disabled unless GALLERY_THUMB_MAX_PX is set. Originals are never resized. */
+/** Optional grid thumbnails — default 1200px progressive JPEG; set GALLERY_THUMB_MAX_PX=0 to disable. Originals are never resized. */
 export const galleryThumbMaxPx = () => parseThumbMaxPx()
 
 const escapeXml = (value) =>
@@ -63,33 +64,52 @@ const derivativeExtension = (storedFilename) => {
     return ext && ext !== "." ? ext : ".jpg"
 }
 
+/** Progressive JPEG for faster perceived loading (grid thumbs). */
+const thumbJpegQuality = () => {
+    const n = Number(process.env.GALLERY_THUMB_JPEG_QUALITY)
+    if (Number.isFinite(n) && n >= 40 && n <= 100) return Math.floor(n)
+    return 82
+}
+
+/** Progressive JPEG for full-res watermarked previews. */
+const previewJpegQuality = () => {
+    const n = Number(process.env.GALLERY_PREVIEW_JPEG_QUALITY)
+    if (Number.isFinite(n) && n >= 40 && n <= 100) return Math.floor(n)
+    return 90
+}
+
 const derivativeNames = (storedFilename) => {
     const parsed = path.parse(storedFilename)
     const base = parsed.name
     const ext = derivativeExtension(storedFilename)
     return {
-        thumbStoredFilename: `${base}-thumb${ext}`,
+        // Thumbs are always progressive JPEG for faster grid paint.
+        thumbStoredFilename: `${base}-thumb.jpg`,
         previewWmStoredFilename: `${base}-preview-wm${ext}`,
     }
 }
 
-const applyOutputFormat = (pipeline, meta) => {
+const applyProgressiveJpeg = (pipeline, quality) =>
+    pipeline.jpeg({
+        quality,
+        mozjpeg: true,
+        progressive: true,
+        chromaSubsampling: "4:2:0",
+    })
+
+const applyOutputFormat = (pipeline, meta, { quality = 90 } = {}) => {
     const format = (meta.format ?? "jpeg").toLowerCase()
     switch (format) {
         case "png":
             return pipeline.png({ compressionLevel: 6 })
         case "webp":
-            return pipeline.webp({ quality: 100, lossless: true })
+            return pipeline.webp({ quality: Math.min(100, quality), effort: 4 })
         case "gif":
             return pipeline.gif()
         case "jpeg":
         case "jpg":
         default:
-            return pipeline.jpeg({
-                quality: 100,
-                mozjpeg: true,
-                chromaSubsampling: "4:4:4",
-            })
+            return applyProgressiveJpeg(pipeline, quality)
     }
 }
 
@@ -164,14 +184,14 @@ export async function generateGalleryPhotoDerivatives({
 
     const { thumbStoredFilename, previewWmStoredFilename } =
         derivativeNames(storedFilename)
-    const thumbMime = mimeForDerivative(thumbStoredFilename)
     const thumbMaxPx = parseThumbMaxPx()
 
     const meta = await sharp(sourceBuffer, { failOn: "none" }).rotate().metadata()
 
     let thumbResultFilename = null
     if (thumbMaxPx > 0) {
-        const thumbBuffer = await applyOutputFormat(
+        // Progressive JPEG — paints early while the rest loads (faster perceived load).
+        const thumbBuffer = await applyProgressiveJpeg(
             sharp(sourceBuffer, { failOn: "none" })
                 .rotate()
                 .resize({
@@ -180,10 +200,15 @@ export async function generateGalleryPhotoDerivatives({
                     fit: "inside",
                     withoutEnlargement: true,
                 }),
-            meta
+            thumbJpegQuality()
         ).toBuffer()
 
-        await writeDerivative(galleryId, thumbStoredFilename, thumbBuffer, thumbMime)
+        await writeDerivative(
+            galleryId,
+            thumbStoredFilename,
+            thumbBuffer,
+            "image/jpeg"
+        )
         thumbResultFilename = thumbStoredFilename
     } else {
         await removeDerivative(galleryId, thumbStoredFilename)
@@ -201,7 +226,8 @@ export async function generateGalleryPhotoDerivatives({
 
         const previewBuffer = await applyOutputFormat(
             sharp(data).composite([{ input: overlay, blend: "over" }]),
-            meta
+            meta,
+            { quality: previewJpegQuality() }
         ).toBuffer()
 
         await writeDerivative(

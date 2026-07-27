@@ -28,6 +28,26 @@ const galleryFinalSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        /** Progressive JPEG poster frame for videos (`*-poster.jpg`). */
+        posterStoredFilename: {
+            type: String,
+            default: null,
+        },
+        /** MPEG-DASH manifest path (`{uuid}-dash/manifest.mpd`). */
+        dashManifestStoredFilename: {
+            type: String,
+            default: null,
+        },
+        dashStatus: {
+            type: String,
+            enum: ["pending", "processing", "ready", "failed", "skipped"],
+            default: null,
+        },
+        dashError: {
+            type: String,
+            trim: true,
+            default: null,
+        },
         url: {
             type: String,
             required: true,

@@ -56,6 +56,7 @@ export const formatPublicStudioResponse = (studio, companySlug) => {
         /** Absolute URL or data URL for the company logo (hero/header). */
         companyLogo: logoSrc ?? null,
         logoSrc: logoSrc ?? null,
+        brandLogo: logoSrc ?? null,
         ...(logoUrl ? { logoUrl } : {}),
     }
 }
@@ -115,7 +116,13 @@ export const formatUserResponse = (user) => {
                   ...(website ? { website } : {}),
                   ...(logoDataUrl ? { logoDataUrl } : {}),
                   ...(logoUrl ? { logoUrl } : {}),
-                  ...(logoSrc ? { logoSrc, companyLogo: logoSrc } : {}),
+                  ...(logoSrc
+                      ? {
+                            logoSrc,
+                            companyLogo: logoSrc,
+                            brandLogo: logoSrc,
+                        }
+                      : { brandLogo: null }),
               }
             : undefined
 
@@ -134,6 +141,7 @@ export const formatUserResponse = (user) => {
         _id: doc._id,
         accountId: doc.accountId?.trim() || null,
         email: doc.email,
+        photographerEmail: doc.email,
         emailVerified: Boolean(doc.emailVerifiedAt),
         emailVerifiedAt: doc.emailVerifiedAt ?? null,
         role: doc.role?.trim() || "Photographer",

@@ -6,6 +6,10 @@ import {
 import { validateSmsSenderId } from "./smsSenderId.js"
 
 const LOGO_DATA_URL_REGEX = /^data:image\/(png|jpe?g);base64,/i
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const isTruthyFlag = (value) =>
+    value === true || value === "true" || value === "1" || value === 1
 
 export const parseStudioInput = (body, { partial = false } = {}) => {
     const companyName = (
@@ -38,9 +42,26 @@ export const parseStudioInput = (body, { partial = false } = {}) => {
         body.sms_sender_id ??
         body.smsDisplayName ??
         body.sms_display_name
-    const logoRaw = body.logoDataUrl ?? body.logo_data_url
+    const emailRaw =
+        body.email ?? body.photographerEmail ?? body.photographer_email
+    const logoRaw =
+        body.logoDataUrl ??
+        body.logo_data_url ??
+        body.brandLogoDataUrl ??
+        body.brand_logo_data_url
     const errors = []
     const fields = {}
+
+    if (emailRaw !== undefined && emailRaw !== null) {
+        const normalizedEmail = String(emailRaw).trim().toLowerCase()
+        if (!normalizedEmail) {
+            errors.push("Photographer email is required")
+        } else if (!EMAIL_REGEX.test(normalizedEmail)) {
+            errors.push("A valid photographer email is required")
+        } else {
+            fields.email = normalizedEmail
+        }
+    }
 
     if (companyName !== undefined || !partial) {
         if (!companyName) {
@@ -109,7 +130,11 @@ export const parseStudioInput = (body, { partial = false } = {}) => {
         } else if (logoResult.value) {
             fields.logoDataUrl = logoResult.value
         }
-    } else if (body.clearLogo === true) {
+    } else if (
+        isTruthyFlag(body.clearLogo) ||
+        isTruthyFlag(body.clearBrandLogo) ||
+        isTruthyFlag(body.clear_brand_logo)
+    ) {
         fields.logoDataUrl = ""
         fields.clearLogo = true
     }
