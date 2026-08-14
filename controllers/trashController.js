@@ -23,6 +23,8 @@ import {
     permanentlyDeleteGalleryPhoto,
 } from "../utils/galleryTrash.js"
 import { GALLERY_CLIENT_POPULATE } from "../utils/clientFields.js"
+import { getEffectiveMaxGalleries } from "../utils/planCatalog.js"
+import { userHasFeature } from "../utils/planFeatures.js"
 
 const populateGalleryBasic = GALLERY_CLIENT_POPULATE
 
@@ -123,8 +125,20 @@ export const listTrash = async (req, res) => {
                 new Date(b.deletedAt).getTime() - new Date(a.deletedAt).getTime()
         )
 
+        const restoreAvailable = userHasFeature(req.user, "restoreTrashItems")
+
         return res.status(200).json({
             retentionDays: GALLERY_TRASH_RETENTION_DAYS,
+            restoreAvailable,
+            ...(restoreAvailable
+                ? {}
+                : {
+                      upgrade: {
+                          feature: "restoreTrashItems",
+                          message:
+                              "Restore deleted galleries and photos is included on Pro and Premium.",
+                      },
+                  }),
             counts: {
                 galleries: galleries.length,
                 photos: photos.length,
@@ -208,12 +222,33 @@ export const restoreTrashItems = async (req, res) => {
                 _id: { $in: galleryIds },
             }).exec()
 
-            for (const gallery of rows) {
+            const restorable = rows.filter((gallery) => {
                 const deadline = effectiveRestoreDeadline(gallery)
                 if (isRestoreExpired(deadline)) {
                     expired.galleries += 1
-                    continue
+                    return false
                 }
+                return true
+            })
+
+            const maxGalleries = getEffectiveMaxGalleries(req.user)
+            if (maxGalleries != null && restorable.length > 0) {
+                const activeCount = await Gallery.countDocuments({
+                    ...ownerPart,
+                    ...galleryNotDeletedFilter(),
+                })
+                if (activeCount + restorable.length > maxGalleries) {
+                    return res.status(403).json({
+                        message: `Gallery limit reached (${maxGalleries}). Upgrade your plan or permanently delete galleries before restoring.`,
+                        code: "GALLERY_LIMIT_REACHED",
+                        maxGalleries,
+                        activeGalleries: activeCount,
+                        requestedRestores: restorable.length,
+                    })
+                }
+            }
+
+            for (const gallery of restorable) {
                 gallery.deletedAt = null
                 gallery.restoreDeadline = null
                 await gallery.save()

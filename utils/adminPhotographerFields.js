@@ -4,7 +4,11 @@ import {
 } from "./formatUserResponse.js"
 import { formatBillingSubscriptionResponse } from "./subscriptionFields.js"
 import { formatBytesLabel } from "./storageFields.js"
-import { getPlanById } from "./planCatalog.js"
+import {
+    getEffectiveStorageLimitBytes,
+    getEffectiveVideoUploadLimitBytes,
+    getPlanById,
+} from "./planCatalog.js"
 
 const escapeRegex = (value) =>
     String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -162,8 +166,10 @@ export const formatAdminPhotographerDetail = ({
     const shaped = formatUserResponse(user)
     const companyLogo = resolveStudioLogoSrc(user.studio ?? {}) ?? null
     const billing = formatBillingSubscriptionResponse(user)
-    const plan = getPlanById(billing.planId) ?? getPlanById("free")
     const storageBytes = storageBreakdown?.totalBytes ?? 0
+    const videoUsedBytes = storageBreakdown?.videoUsedBytes ?? 0
+    const storageLimitBytes = getEffectiveStorageLimitBytes(user)
+    const videoUploadLimitBytes = getEffectiveVideoUploadLimitBytes(user)
 
     return {
         ...shaped,
@@ -192,8 +198,12 @@ export const formatAdminPhotographerDetail = ({
             galleries: galleryCounts,
             storageBytes,
             storageLabel: formatBytesLabel(storageBytes),
-            storageLimitBytes: plan.storageLimitBytes,
-            storageLimitLabel: formatBytesLabel(plan.storageLimitBytes),
+            storageLimitBytes,
+            storageLimitLabel: formatBytesLabel(storageLimitBytes),
+            videoUsedBytes,
+            videoUploadLimitBytes,
+            videoUploadLimitLabel: formatBytesLabel(videoUploadLimitBytes),
+            maxGalleries: billing.maxGalleries ?? null,
         },
         recentSessions,
     }

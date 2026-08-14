@@ -19,6 +19,7 @@ export const videoStreamingReady = (doc) => {
     if (doc?.isVideo !== true && !isGalleryVideoMime(doc?.mimeType)) return true
     if (!galleryVideoDashEnabled()) return true
     const status = doc?.dashStatus
+    if (status === "skipped" || status === "disabled") return true
     if (!status || status === "pending" || status === "processing") return false
     return true
 }

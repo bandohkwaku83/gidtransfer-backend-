@@ -170,6 +170,11 @@ const subscriptionSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+        /** When the studio last upgraded onto a paid plan (or switched paid plans). */
+        upgradedAt: {
+            type: Date,
+            default: null,
+        },
         cancelAtPeriodEnd: {
             type: Boolean,
             default: false,
@@ -179,6 +184,33 @@ const subscriptionSchema = new mongoose.Schema(
             type: String,
             trim: true,
             default: "",
+        },
+        /** Period-end we already sent the 10-day renewal reminder for (dedupe). */
+        renewalReminderPeriodEnd: {
+            type: Date,
+            default: null,
+        },
+        renewalReminderSentAt: {
+            type: Date,
+            default: null,
+        },
+        /** End of the one-time Free plan trial (set at signup). */
+        trialEndsAt: {
+            type: Date,
+            default: null,
+        },
+        /** Temporary admin bumps (storage / gallery caps). */
+        limitOverride: {
+            storageLimitBytes: { type: Number, default: null },
+            maxGalleries: { type: Number, default: null },
+            expiresAt: { type: Date, default: null },
+            reason: { type: String, trim: true, default: "" },
+            setByAdmin: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "Admin",
+                default: null,
+            },
+            setAt: { type: Date, default: null },
         },
     },
     { _id: false }

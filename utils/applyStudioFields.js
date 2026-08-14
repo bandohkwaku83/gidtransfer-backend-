@@ -14,6 +14,19 @@ import {
     EMAIL_VERIFICATION_EXPIRY_MS,
 } from "./emailVerification.js"
 import { sendEmailVerificationOtp } from "./photographerNotifications.js"
+import { userHasFeature } from "./planFeatures.js"
+
+const assertCustomSmsSenderAllowed = (user, fields) => {
+    if (fields.smsSenderId === undefined) return
+    if (userHasFeature(user, "customSmsSender")) return
+    const err = new Error(
+        "Custom SMS sender ID is available on the Pro or Premium plan."
+    )
+    err.statusCode = 403
+    err.code = "PLAN_FEATURE_REQUIRED"
+    err.feature = "customSmsSender"
+    throw err
+}
 
 const assertEmailAvailable = async (email, { excludeUserId } = {}) => {
     const filter = { email }
@@ -70,11 +83,20 @@ export const applyPhotographerEmailChange = async (user, nextEmail) => {
 export const applyStudioFieldsToUser = async (
     user,
     fields,
-    { uploadedFile, partial = false } = {}
+    {
+        uploadedFile,
+        partial = false,
+        /** Onboarding may collect a sender ID before the user is on Pro/Premium. */
+        allowCustomSmsSender = false,
+    } = {}
 ) => {
     const studio = user.studio ?? {}
     const previousLogoUrl = studio.logoUrl || ""
     let emailChanged = false
+
+    if (!allowCustomSmsSender) {
+        assertCustomSmsSenderAllowed(user, fields)
+    }
 
     if (fields.email !== undefined) {
         emailChanged = await applyPhotographerEmailChange(user, fields.email)
@@ -145,8 +167,7 @@ export const applyStudioFieldsToUser = async (
         studio.phone?.trim() &&
         studio.companySlug?.trim() &&
         studio.primaryDeliverable?.trim() &&
-        studio.country?.trim() &&
-        studio.smsSenderId?.trim()
+        studio.country?.trim()
 
     if (hasOnboardingBasics) {
         user.onboardingCompletedAt = user.onboardingCompletedAt ?? new Date()

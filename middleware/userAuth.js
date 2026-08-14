@@ -8,6 +8,11 @@ import {
 } from "../utils/emailVerification.js"
 import { touchUserActivity } from "../utils/userSessions.js"
 import { cacheGetOrSet } from "../utils/memoryCache.js"
+import {
+    findActiveApiTokenBySecret,
+    isApiTokenString,
+    touchApiTokenUsage,
+} from "../utils/apiTokens.js"
 
 const AUTH_CACHE_TTL_MS = Number(process.env.AUTH_CACHE_TTL_MS ?? 60_000)
 
@@ -43,6 +48,31 @@ export const protectUser = async (req, res, next) => {
             return res
                 .status(401)
                 .json({ message: "Not authorized, token missing" })
+        }
+
+        if (isApiTokenString(token)) {
+            const apiToken = await findActiveApiTokenBySecret(token)
+            if (!apiToken) {
+                return res.status(401).json({
+                    message: "Not authorized, API token invalid or revoked",
+                })
+            }
+
+            const user = await User.findById(apiToken.owner)
+            if (!user || user.isActive === false) {
+                return res.status(401).json({ message: "Account no longer exists" })
+            }
+            if (!isEmailVerified(user) && !emailVerificationExempt(req)) {
+                return res.status(403).json({
+                    message: "Email verification required",
+                    code: "EMAIL_NOT_VERIFIED",
+                })
+            }
+
+            touchApiTokenUsage(apiToken).catch(() => {})
+            req.user = user
+            req.authVia = "api_token"
+            return next()
         }
 
         let decoded

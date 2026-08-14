@@ -6,6 +6,7 @@ import { beginUserSession, endAllUserSessions, issueAuthenticatedSession } from 
 import { providerSignInHint } from "../utils/authMessages.js"
 import { nextAccountId } from "../utils/accountId.js"
 import { formatUserResponse } from "../utils/formatUserResponse.js"
+import { defaultTrialEndsAt } from "../utils/planCatalog.js"
 import {
     createPasswordResetToken,
     hashPasswordResetToken,
@@ -83,7 +84,15 @@ export const register = async (req, res) => {
         }
 
         const accountId = await nextAccountId()
-        const user = await User.create({ ...fields, accountId })
+        const user = await User.create({
+            ...fields,
+            accountId,
+            subscription: {
+                planId: "free",
+                status: "free",
+                trialEndsAt: defaultTrialEndsAt(),
+            },
+        })
         await issueAndSendEmailVerification(user)
 
         const { token, user: updatedUser } = await issueAuthenticatedSession(user, {
@@ -327,6 +336,11 @@ export const googleAuth = async (req, res) => {
             agreedToTermsAt: new Date(),
             accountId: await nextAccountId(),
             emailVerifiedAt: new Date(),
+            subscription: {
+                planId: "free",
+                status: "free",
+                trialEndsAt: defaultTrialEndsAt(),
+            },
         })
 
         const { token, user: updatedUser } = await issueAuthenticatedSession(user, {
@@ -394,6 +408,10 @@ export const verifyEmail = async (req, res) => {
         user.emailVerificationOtpHash = undefined
         user.emailVerificationExpires = undefined
         await user.save()
+
+        // Auth middleware caches the lean user for AUTH_CACHE_TTL_MS. Clear it so
+        // the next /api/onboarding call sees emailVerifiedAt immediately.
+        cacheDeletePrefix(`auth:user:${user._id}:`)
 
         let sessionId = null
         const authHeader = req.headers.authorization

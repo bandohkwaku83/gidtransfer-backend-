@@ -32,6 +32,7 @@ import {
     reorderGalleryUploads,
     restoreGalleryPhoto,
     uploadGalleryPhotos,
+    withUploadKind,
 } from "../controllers/galleryUploadController.js"
 import {
     createGallerySet,
@@ -63,10 +64,12 @@ import {
     uploadGalleryFinals,
 } from "../controllers/galleryFinalController.js"
 import { multipartGalleryCoverOptional } from "../middleware/multipartGalleryCoverOptional.js"
-import { handleGalleryPhotosUpload } from "../middleware/uploadGalleryPhotos.js"
+import { handleGalleryMediaUpload, handleGalleryPhotosUpload } from "../middleware/uploadGalleryPhotos.js"
+import { handleGalleryVideosUpload } from "../middleware/uploadGalleryVideos.js"
 import { handleGalleryMusicUpload } from "../middleware/uploadGalleryMusic.js"
 import { handleGalleryFinalsUpload } from "../middleware/uploadGalleryFinals.js"
 import { protectUser } from "../middleware/userAuth.js"
+import { requirePlanFeature } from "../middleware/requirePlanFeature.js"
 
 const router = express.Router()
 
@@ -91,16 +94,55 @@ router.patch("/:id/upload-settings", updateGalleryUploadSettings)
 router.patch("/:id/final-settings", updateGalleryFinalSettings)
 
 router.get("/:id/sets", listGallerySets)
-router.patch("/:id/sets-settings", updateGallerySetsSettings)
-router.post("/:id/sets", createGallerySet)
-router.patch("/:id/sets/:setId", updateGallerySet)
+router.patch(
+    "/:id/sets-settings",
+    requirePlanFeature("gallerySets"),
+    updateGallerySetsSettings
+)
+router.post("/:id/sets", requirePlanFeature("gallerySets"), createGallerySet)
+router.patch("/:id/sets/:setId", requirePlanFeature("gallerySets"), updateGallerySet)
 router.delete("/:id/sets/:setId", deleteGallerySet)
 
 router.get("/:id/uploads", listGalleryUploads)
+router.post(
+    "/:id/uploads/photos/presign",
+    withUploadKind("photo"),
+    presignGalleryPhotoUploads
+)
+router.post(
+    "/:id/uploads/photos/complete",
+    withUploadKind("photo"),
+    completeGalleryPhotoUploads
+)
+router.post(
+    "/:id/uploads/photos",
+    withUploadKind("photo"),
+    handleGalleryPhotosUpload,
+    uploadGalleryPhotos
+)
+router.post(
+    "/:id/uploads/videos/presign",
+    requirePlanFeature("videoUploads"),
+    withUploadKind("video"),
+    presignGalleryPhotoUploads
+)
+router.post(
+    "/:id/uploads/videos/complete",
+    requirePlanFeature("videoUploads"),
+    withUploadKind("video"),
+    completeGalleryPhotoUploads
+)
+router.post(
+    "/:id/uploads/videos",
+    requirePlanFeature("videoUploads"),
+    withUploadKind("video"),
+    handleGalleryVideosUpload,
+    uploadGalleryPhotos
+)
 router.post("/:id/uploads/presign", presignGalleryPhotoUploads)
 router.post("/:id/uploads/complete", completeGalleryPhotoUploads)
 router.patch("/:id/uploads/reorder", reorderGalleryUploads)
-router.post("/:id/uploads", handleGalleryPhotosUpload, uploadGalleryPhotos)
+router.post("/:id/uploads", handleGalleryMediaUpload, uploadGalleryPhotos)
 router.post("/:id/uploads/bulk-delete", bulkDeleteGalleryPhotos)
 router.delete("/:id/uploads/:photoId", deleteGalleryPhoto)
 router.post("/:id/uploads/:photoId/restore", restoreGalleryPhoto)

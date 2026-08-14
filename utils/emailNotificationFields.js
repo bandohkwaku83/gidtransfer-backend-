@@ -90,6 +90,10 @@ export const photographerWantsEmail = (user, kind) => {
             return prefs.galleryFlags
         case "gallery_selections":
             return prefs.gallerySelections
+        case "billing_upgrade":
+        case "billing_renewal_reminder":
+            // Billing alerts stay on whenever the photographer has emails enabled.
+            return true
         default:
             return true
     }

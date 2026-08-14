@@ -24,7 +24,14 @@ import { parseDirectUploadFiles } from "../utils/directUploadHelpers.js"
 import { s3Configured } from "../utils/s3Storage.js"
 import { scheduleGalleryPhotoDerivatives } from "../utils/galleryDerivativeQueue.js"
 import { scheduleGalleryVideoDash } from "../utils/galleryVideoQueue.js"
+import { userHasFeature } from "../utils/planFeatures.js"
+import {
+    sendVideoUploadDenied,
+    videoBytesFromFiles,
+    videoUploadDeniedPayload,
+} from "../utils/planVideoUploads.js"
 import { resolveWatermarkPreviewText } from "../utils/previewWatermark.js"
+import { parseGalleryUploadKind } from "../utils/galleryMediaTypes.js"
 import {
     GALLERY_MEDIA_SORT,
     getNextGalleryMediaSortOrder,
@@ -51,6 +58,60 @@ const parseOnConflict = (value) => {
     const s = String(value ?? "skip").trim().toLowerCase()
     if (s === "replace" || s === "skip" || s === "cancel") return s
     return "skip"
+}
+
+/**
+ * Resolve photo vs video upload mode.
+ * Prefer route-forced kind (`req.uploadKind`), then body/query `mediaType` / `kind`.
+ */
+const resolveUploadKind = (req, { required = false } = {}) => {
+    if (req.uploadKind === "photo" || req.uploadKind === "video") {
+        return req.uploadKind
+    }
+    const raw =
+        req.body?.mediaType ??
+        req.body?.media_type ??
+        req.body?.kind ??
+        req.body?.uploadKind ??
+        req.body?.upload_kind ??
+        req.query?.mediaType ??
+        req.query?.kind
+    const kind = parseGalleryUploadKind(raw)
+    if (required && !kind) {
+        return {
+            error:
+                "mediaType is required: use \"photo\" or \"video\" (or call /uploads/photos or /uploads/videos)",
+        }
+    }
+    return kind
+}
+
+const withUploadKind = (kind) => (req, _res, next) => {
+    req.uploadKind = kind
+    next()
+}
+
+export { withUploadKind }
+
+const denyVideoUploadIfNeeded = async (req, res, files, replacingBytes = 0) => {
+    const incoming = videoBytesFromFiles(files)
+    if (incoming <= 0) return false
+    const denied = await videoUploadDeniedPayload(req.user, incoming, {
+        replacingBytes,
+    })
+    if (!denied) return false
+    sendVideoUploadDenied(res, denied)
+    return true
+}
+
+const s3UploadHintForKind = (kind) => {
+    if (kind === "photo") {
+        return "Server-side upload is disabled when S3 is configured. Use POST /api/galleries/:id/uploads/photos/presign then POST /api/galleries/:id/uploads/photos/complete"
+    }
+    if (kind === "video") {
+        return "Server-side upload is disabled when S3 is configured. Use POST /api/galleries/:id/uploads/videos/presign then POST /api/galleries/:id/uploads/videos/complete"
+    }
+    return "Server-side upload is disabled when S3 is configured. Use POST /api/galleries/:id/uploads/presign then POST /api/galleries/:id/uploads/complete"
 }
 
 const parseApplyPreviewWatermark = (body, gallery) => {
@@ -83,6 +144,7 @@ async function persistGalleryPhotoWithDerivatives({
     watermarkText,
     nextSortOrder,
     directMeta,
+    enableDash = false,
 }) {
     const name =
         directMeta?.originalFilename ??
@@ -113,7 +175,11 @@ async function persistGalleryPhotoWithDerivatives({
         replace.previewWmStoredFilename = null
         replace.posterStoredFilename = null
         replace.dashManifestStoredFilename = null
-        replace.dashStatus = saved.isVideo ? "pending" : null
+        replace.dashStatus = saved.isVideo
+            ? enableDash
+                ? "pending"
+                : "skipped"
+            : null
         replace.dashError = null
         if (uploadSetId !== undefined) replace.set = uploadSetId
         await replace.save()
@@ -126,15 +192,17 @@ async function persistGalleryPhotoWithDerivatives({
             watermarkText,
             applyWatermark: applyPreviewWatermark,
         })
-        scheduleGalleryVideoDash({
-            kind: "photo",
-            mediaId: replace._id,
-            galleryId: gallery._id,
-            storedFilename: saved.storedFilename,
-            mimeType,
-            sizeBytes,
-            isVideo: saved.isVideo,
-        })
+        if (enableDash) {
+            scheduleGalleryVideoDash({
+                kind: "photo",
+                mediaId: replace._id,
+                galleryId: gallery._id,
+                storedFilename: saved.storedFilename,
+                mimeType,
+                sizeBytes,
+                isVideo: saved.isVideo,
+            })
+        }
         return replace
     }
 
@@ -155,7 +223,7 @@ async function persistGalleryPhotoWithDerivatives({
         mimeType,
         sizeBytes,
         isVideo: saved.isVideo,
-        dashStatus: saved.isVideo ? "pending" : null,
+        dashStatus: saved.isVideo ? (enableDash ? "pending" : "skipped") : null,
         sortOrder: nextSortOrder,
         ...(uploadSetId !== undefined ? { set: uploadSetId } : {}),
     })
@@ -168,15 +236,17 @@ async function persistGalleryPhotoWithDerivatives({
         watermarkText,
         applyWatermark: applyPreviewWatermark,
     })
-    scheduleGalleryVideoDash({
-        kind: "photo",
-        mediaId: photo._id,
-        galleryId: gallery._id,
-        storedFilename: saved.storedFilename,
-        mimeType,
-        sizeBytes,
-        isVideo: saved.isVideo,
-    })
+    if (enableDash) {
+        scheduleGalleryVideoDash({
+            kind: "photo",
+            mediaId: photo._id,
+            galleryId: gallery._id,
+            storedFilename: saved.storedFilename,
+            mimeType,
+            sizeBytes,
+            isVideo: saved.isVideo,
+        })
+    }
     scheduleGalleryPhotoIndex(photo)
 
     return photo
@@ -197,6 +267,15 @@ export const listGalleryUploads = async (req, res) => {
         const filter = { gallery: gallery._id }
         if (!includeTrash) {
             filter.deletedAt = null
+        }
+
+        const listKind = parseGalleryUploadKind(
+            req.query.mediaType ?? req.query.kind ?? req.query.type
+        )
+        if (listKind === "photo") {
+            filter.isVideo = { $ne: true }
+        } else if (listKind === "video") {
+            filter.isVideo = true
         }
 
         const pagination = parsePagination(req.query, {
@@ -237,6 +316,7 @@ export const listGalleryUploads = async (req, res) => {
                     total: hit.total,
                 }),
                 view: gridView ? "grid" : "full",
+                ...(listKind ? { mediaType: listKind } : {}),
                 search: {
                     engine: hit.engine,
                     q: searchParams.q ?? null,
@@ -248,6 +328,7 @@ export const listGalleryUploads = async (req, res) => {
                         eyesOpen: searchParams.eyesOpen ?? null,
                         minQuality: searchParams.minQuality ?? null,
                         maxQuality: searchParams.maxQuality ?? null,
+                        mediaType: listKind,
                     },
                 },
             })
@@ -265,6 +346,7 @@ export const listGalleryUploads = async (req, res) => {
             photos: rows.map((row) => formatPhoto(row)),
             pagination: buildPaginationMeta({ ...pagination, total }),
             view: gridView ? "grid" : "full",
+            ...(listKind ? { mediaType: listKind } : {}),
         })
     } catch (error) {
         console.error("listGalleryUploads:", error)
@@ -287,16 +369,26 @@ export const presignGalleryPhotoUploads = async (req, res) => {
             return res.status(404).json({ message: "Gallery not found" })
         }
 
+        const kindResolved = resolveUploadKind(req)
+        if (kindResolved?.error) {
+            return res.status(400).json({ message: kindResolved.error })
+        }
+        const uploadKind = kindResolved
+
         const parsed = parseDirectUploadFiles(req.body)
         if (parsed.error) {
             return res.status(400).json({ message: parsed.error })
         }
 
         for (const file of parsed.files) {
-            const err = validateGalleryPhotoMeta(file)
+            const err = validateGalleryPhotoMeta(file, { kind: uploadKind })
             if (err) {
                 return res.status(400).json({ message: err })
             }
+        }
+
+        if (await denyVideoUploadIfNeeded(req, res, parsed.files)) {
+            return
         }
 
         const uploads = await Promise.all(
@@ -313,6 +405,11 @@ export const presignGalleryPhotoUploads = async (req, res) => {
                         originalFilename: file.originalFilename,
                         mimeType: file.mimeType,
                         sizeBytes: file.sizeBytes,
+                        mediaType:
+                            uploadKind ??
+                            (file.mimeType?.startsWith("video/")
+                                ? "video"
+                                : "photo"),
                         presignedUrl: presigned.presignedUrl,
                         method: presigned.method,
                         headers: presigned.headers,
@@ -326,7 +423,10 @@ export const presignGalleryPhotoUploads = async (req, res) => {
             })
         )
 
-        return res.status(200).json({ uploads })
+        return res.status(200).json({
+            uploads,
+            ...(uploadKind ? { mediaType: uploadKind } : {}),
+        })
     } catch (error) {
         if (error?.statusCode === 400) {
             return res.status(400).json({ message: error.message })
@@ -350,6 +450,12 @@ export const completeGalleryPhotoUploads = async (req, res) => {
             return res.status(404).json({ message: "Gallery not found" })
         }
 
+        const kindResolved = resolveUploadKind(req)
+        if (kindResolved?.error) {
+            return res.status(400).json({ message: kindResolved.error })
+        }
+        const uploadKind = kindResolved
+
         const parsed = parseDirectUploadFiles(req.body)
         if (parsed.error) {
             return res.status(400).json({ message: parsed.error })
@@ -361,10 +467,14 @@ export const completeGalleryPhotoUploads = async (req, res) => {
                     message: "Each file must include storedFilename from presign response",
                 })
             }
-            const err = validateGalleryPhotoMeta(file)
+            const err = validateGalleryPhotoMeta(file, { kind: uploadKind })
             if (err) {
                 return res.status(400).json({ message: err })
             }
+        }
+
+        if (await denyVideoUploadIfNeeded(req, res, parsed.files)) {
+            return
         }
 
         const verifyResults = await Promise.all(
@@ -398,7 +508,7 @@ export const completeGalleryPhotoUploads = async (req, res) => {
         const existing = await GalleryPhoto.find({
             gallery: gallery._id,
             deletedAt: null,
-        }).select("originalFilename _id storedFilename url")
+        }).select("originalFilename _id storedFilename url isVideo sizeBytes")
 
         const byName = new Map(
             existing.map((p) => [p.originalFilename.toLowerCase(), p])
@@ -434,6 +544,16 @@ export const completeGalleryPhotoUploads = async (req, res) => {
             })
         }
 
+        const replacingBytes = toUpload.reduce((sum, item) => {
+            if (item.replace?.isVideo) {
+                return sum + Number(item.replace.sizeBytes ?? 0)
+            }
+            return sum
+        }, 0)
+        if (await denyVideoUploadIfNeeded(req, res, parsed.files, replacingBytes)) {
+            return
+        }
+
         const created = []
         const replaced = []
         const skipped =
@@ -458,6 +578,7 @@ export const completeGalleryPhotoUploads = async (req, res) => {
                     ownerId: req.user._id,
                     applyPreviewWatermark,
                     watermarkText,
+                    enableDash: userHasFeature(req.user, "videoDash"),
                 })
                 replaced.push(
                     formatGalleryPhotoResponse(row, {
@@ -476,6 +597,7 @@ export const completeGalleryPhotoUploads = async (req, res) => {
                     applyPreviewWatermark,
                     watermarkText,
                     nextSortOrder,
+                    enableDash: userHasFeature(req.user, "videoDash"),
                 })
                 nextSortOrder += 1
                 created.push(
@@ -497,6 +619,7 @@ export const completeGalleryPhotoUploads = async (req, res) => {
             replaced,
             skipped,
             conflicts: conflicts.length ? conflicts : undefined,
+            ...(uploadKind ? { mediaType: uploadKind } : {}),
         })
     } catch (error) {
         console.error("completeGalleryPhotoUploads:", error)
@@ -506,10 +629,15 @@ export const completeGalleryPhotoUploads = async (req, res) => {
 
 export const uploadGalleryPhotos = async (req, res) => {
     try {
+        const kindResolved = resolveUploadKind(req)
+        if (kindResolved?.error) {
+            return res.status(400).json({ message: kindResolved.error })
+        }
+        const uploadKind = kindResolved
+
         if (s3Configured()) {
             return res.status(400).json({
-                message:
-                    "Server-side upload is disabled when S3 is configured. Use POST /api/galleries/:id/uploads/presign then POST /api/galleries/:id/uploads/complete",
+                message: s3UploadHintForKind(uploadKind),
             })
         }
 
@@ -521,7 +649,14 @@ export const uploadGalleryPhotos = async (req, res) => {
 
         const files = req.files ?? []
         if (!files.length) {
-            return res.status(400).json({ message: "No files provided" })
+            return res.status(400).json({
+                message:
+                    uploadKind === "video"
+                        ? "No videos provided (multipart field: videos)"
+                        : uploadKind === "photo"
+                          ? "No photos provided (multipart field: photos)"
+                          : "No files provided",
+            })
         }
 
         const onConflict = parseOnConflict(
@@ -539,7 +674,7 @@ export const uploadGalleryPhotos = async (req, res) => {
         const existing = await GalleryPhoto.find({
             gallery: gallery._id,
             deletedAt: null,
-        }).select("originalFilename _id storedFilename url")
+        }).select("originalFilename _id storedFilename url isVideo sizeBytes")
 
         const byName = new Map(
             existing.map((p) => [p.originalFilename.toLowerCase(), p])
@@ -549,7 +684,7 @@ export const uploadGalleryPhotos = async (req, res) => {
         const toUpload = []
 
         for (const file of files) {
-            const err = validateGalleryPhotoFile(file)
+            const err = validateGalleryPhotoFile(file, { kind: uploadKind })
             if (err) {
                 return res.status(400).json({ message: err })
             }
@@ -580,6 +715,16 @@ export const uploadGalleryPhotos = async (req, res) => {
             })
         }
 
+        const replacingBytes = toUpload.reduce((sum, item) => {
+            if (item.replace?.isVideo) {
+                return sum + Number(item.replace.sizeBytes ?? 0)
+            }
+            return sum
+        }, 0)
+        if (await denyVideoUploadIfNeeded(req, res, files, replacingBytes)) {
+            return
+        }
+
         const created = []
         const replaced = []
         const skipped =
@@ -602,6 +747,7 @@ export const uploadGalleryPhotos = async (req, res) => {
                     ownerId: req.user._id,
                     applyPreviewWatermark,
                     watermarkText,
+                    enableDash: userHasFeature(req.user, "videoDash"),
                 })
                 replaced.push(
                     formatGalleryPhotoResponse(row, {
@@ -619,6 +765,7 @@ export const uploadGalleryPhotos = async (req, res) => {
                     applyPreviewWatermark,
                     watermarkText,
                     nextSortOrder,
+                    enableDash: userHasFeature(req.user, "videoDash"),
                 })
                 nextSortOrder += 1
                 created.push(
@@ -640,6 +787,7 @@ export const uploadGalleryPhotos = async (req, res) => {
             replaced,
             skipped,
             conflicts: conflicts.length ? conflicts : undefined,
+            ...(uploadKind ? { mediaType: uploadKind } : {}),
         })
     } catch (error) {
         console.error("uploadGalleryPhotos:", error)

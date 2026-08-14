@@ -13,6 +13,13 @@ import { getOwnerStorageBreakdown } from "../utils/storageUsage.js"
 import { settingsUploadedFiles } from "../middleware/uploadSettings.js"
 
 const handleSettingsError = (res, error) => {
+    if (error.statusCode === 403) {
+        return res.status(403).json({
+            message: error.message,
+            code: error.code || "PLAN_FEATURE_REQUIRED",
+            feature: error.feature || "customSmsSender",
+        })
+    }
     if (error.statusCode === 400 || error.statusCode === 409) {
         return res.status(error.statusCode).json({ message: error.message })
     }
@@ -42,6 +49,7 @@ export const getSettings = async (req, res) => {
                 user: req.user,
                 galleryCount,
                 storageUsedBytes: storageBreakdown.totalBytes,
+                videoUsedBytes: storageBreakdown.videoUsedBytes,
             }),
             user: formatUserResponse(req.user),
         })
@@ -98,6 +106,7 @@ export const updateSettings = async (req, res) => {
                 user: req.user,
                 galleryCount,
                 storageUsedBytes: storageBreakdown.totalBytes,
+                videoUsedBytes: storageBreakdown.videoUsedBytes,
             }),
             user,
             ...(requiresEmailVerification
@@ -122,6 +131,7 @@ export const getSettingsOverview = async (req, res) => {
             user: req.user,
             galleryCount: counts.all,
             storageUsedBytes: storageBreakdown.totalBytes,
+            videoUsedBytes: storageBreakdown.videoUsedBytes,
         })
 
         return res.status(200).json({
@@ -172,6 +182,7 @@ export const getSettingsProfile = async (req, res) => {
             user: req.user,
             galleryCount,
             storageUsedBytes: storageBreakdown.totalBytes,
+            videoUsedBytes: storageBreakdown.videoUsedBytes,
         })
 
         return res.status(200).json({

@@ -60,6 +60,7 @@ import User from "../models/User.js"
 import { BOOKING_SHOOT_TYPES } from "../utils/bookingShootTypes.js"
 import { formatGalleryDesignMeta } from "../utils/galleryDesignFields.js"
 import { GALLERY_CLIENT_POPULATE } from "../utils/clientFields.js"
+import { sendFeatureDenied, userHasFeature } from "../utils/planFeatures.js"
 
 const validationMessage = (error) =>
     Object.values(error.errors)
@@ -121,6 +122,10 @@ export const proposeGalleryDescription = async (req, res) => {
             req.body?.galleryType?.trim?.() ??
             req.body?.gallery_type?.trim?.() ??
             null
+
+        if (!userHasFeature(req.user, "galleryAi")) {
+            return sendFeatureDenied(res, "galleryAi", { user: req.user })
+        }
 
         const description = await generateGalleryDescriptionFromEventName(
             name ?? "",
@@ -288,6 +293,9 @@ export const createGallery = async (req, res) => {
         }
 
         const wantAi = parseGenerateDescriptionAi(req.body)
+        if (wantAi && !userHasFeature(req.user, "galleryAi")) {
+            return sendFeatureDenied(res, "galleryAi", { user: req.user })
+        }
 
         let description = ""
         if (wantAi) {
@@ -316,8 +324,25 @@ export const createGallery = async (req, res) => {
             return res.status(404).json({ message: "Client not found" })
         }
 
+        const { getEffectiveMaxGalleries } = await import("../utils/planCatalog.js")
+        const maxGalleries = getEffectiveMaxGalleries(req.user)
+        if (maxGalleries != null) {
+            const activeCount = await Gallery.countDocuments({
+                owner: req.user._id,
+                deletedAt: null,
+            })
+            if (activeCount >= maxGalleries) {
+                return res.status(403).json({
+                    message: `Gallery limit reached (${maxGalleries}). Upgrade your plan or contact support.`,
+                    code: "GALLERY_LIMIT_REACHED",
+                    maxGalleries,
+                    activeGalleries: activeCount,
+                })
+            }
+        }
+
         const ownerSettings = await User.findById(req.user._id).select(
-            "galleryDefaults watermark"
+            "galleryDefaults watermark subscription"
         )
         const watermarkPreviewEnabled = Boolean(
             ownerSettings?.galleryDefaults?.watermarkPreviewEnabled
@@ -410,6 +435,9 @@ export const updateGallery = async (req, res) => {
         }
 
         const wantAi = parseGenerateDescriptionAi(req.body)
+        if (wantAi && !userHasFeature(req.user, "galleryAi")) {
+            return sendFeatureDenied(res, "galleryAi", { user: req.user })
+        }
         let appliedAi = false
         const nameSource = fields.name ?? gallery.name
 
@@ -652,21 +680,30 @@ export const createShareLink = async (req, res) => {
         let smsError = null
 
         if (notifyClientViaSms) {
-            const companySlug =
-                owner?.studio?.companySlug?.trim() ||
-                req.user.studio?.companySlug?.trim()
-            try {
-                sms = await notifyClientGalleryShareSms({
-                    gallery,
-                    ownerStudio: owner?.studio ?? req.user.studio,
-                    companySlug,
-                    customMessage: req.body?.message,
-                })
-            } catch (error) {
-                const mapped = mapGallerySmsError(error)
+            if (!userHasFeature(req.user, "smsNotifications")) {
                 smsError = {
-                    message: mapped.message,
-                    code: mapped.code,
+                    message:
+                        "SMS notifications are included on Basic, Pro, and Premium.",
+                    code: "PLAN_FEATURE_REQUIRED",
+                    feature: "smsNotifications",
+                }
+            } else {
+                const companySlug =
+                    owner?.studio?.companySlug?.trim() ||
+                    req.user.studio?.companySlug?.trim()
+                try {
+                    sms = await notifyClientGalleryShareSms({
+                        gallery,
+                        ownerStudio: owner?.studio ?? req.user.studio,
+                        companySlug,
+                        customMessage: req.body?.message,
+                    })
+                } catch (error) {
+                    const mapped = mapGallerySmsError(error)
+                    smsError = {
+                        message: mapped.message,
+                        code: mapped.code,
+                    }
                 }
             }
         }

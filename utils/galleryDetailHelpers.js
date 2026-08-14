@@ -257,10 +257,15 @@ export const formatGalleryPhotoResponse = (
     if (posterUrl) response.posterUrl = posterUrl
     if (dashUrl) response.dashUrl = dashUrl
 
-    // gridUrl / viewUrl always point at full-resolution originals unless a
-    // watermarked client preview is explicitly enabled for viewUrl.
-    // Videos prefer poster for grid when available.
-    response.gridUrl = posterUrl && p.isVideo === true ? posterUrl : url
+    // Grid tiles must never use full-resolution camera originals — those are
+    // usually baseline JPEG and paint top-to-bottom while downloading.
+    // Prefer progressive thumb (images) or poster (videos); fall back to url
+    // only until derivatives finish.
+    if (p.isVideo === true) {
+        response.gridUrl = posterUrl || url
+    } else {
+        response.gridUrl = thumbUrl || url
+    }
     response.viewUrl =
         watermarkPreviewEnabled && displayUrl ? displayUrl : url
 
@@ -272,7 +277,7 @@ export const formatGalleryPhotoResponse = (
     return response
 }
 
-/** Grid/list tile payload — full-resolution URLs; thumbUrl remains optional when generated. */
+/** Grid/list tile payload — uses progressive thumb/poster via gridUrl. */
 export const formatGalleryPhotoGridResponse = (
     doc,
     options = {}

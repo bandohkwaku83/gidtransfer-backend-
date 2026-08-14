@@ -26,6 +26,31 @@ import {
     sendCommunicationSms,
     sendPhotographerCommunication,
 } from "../controllers/adminCommunicationController.js"
+import {
+    emptyAdminStudioTrash,
+    extendAdminGalleryShare,
+    getAdminGallery,
+    listAdminGalleries,
+    listAdminTrash,
+    listModerationFlaggedFinals,
+    listPhotographerGalleriesAdmin,
+    patchAdminGalleryShare,
+    purgeAdminExpiredTrash,
+    purgeAdminGallery,
+    restoreAdminGallery,
+    revokeAdminGalleryShare,
+} from "../controllers/adminGalleryController.js"
+import {
+    getStudioCrmSummary,
+    listAdminBookingsCalendar,
+    listStudioClientTotals,
+} from "../controllers/adminCrmController.js"
+import {
+    listAdminBillingEvents,
+    listAdminPlans,
+    setPhotographerLimitOverride,
+    updateAdminPlan,
+} from "../controllers/adminBillingController.js"
 import { protect } from "../middleware/auth.js"
 import { requireAdmin } from "../middleware/requireAdmin.js"
 
@@ -43,11 +68,23 @@ router.get(
     requireAdmin,
     listPhotographerSessions
 )
+router.get(
+    "/photographers/:userId/galleries",
+    protect,
+    requireAdmin,
+    listPhotographerGalleriesAdmin
+)
 router.post(
     "/photographers/:userId/communicate",
     protect,
     requireAdmin,
     sendPhotographerCommunication
+)
+router.put(
+    "/photographers/:userId/limit-override",
+    protect,
+    requireAdmin,
+    setPhotographerLimitOverride
 )
 router.patch(
     "/photographers/:userId/activate",
@@ -101,5 +138,75 @@ router.patch(
     requireAdmin,
     rejectStudioSenderId
 )
+
+/* Gallery inspector */
+router.get("/galleries", protect, requireAdmin, listAdminGalleries)
+router.get("/galleries/:galleryId", protect, requireAdmin, getAdminGallery)
+router.post(
+    "/galleries/:galleryId/share/revoke",
+    protect,
+    requireAdmin,
+    revokeAdminGalleryShare
+)
+router.post(
+    "/galleries/:galleryId/share/extend",
+    protect,
+    requireAdmin,
+    extendAdminGalleryShare
+)
+router.patch(
+    "/galleries/:galleryId/share",
+    protect,
+    requireAdmin,
+    patchAdminGalleryShare
+)
+router.post(
+    "/galleries/:galleryId/restore",
+    protect,
+    requireAdmin,
+    restoreAdminGallery
+)
+router.delete(
+    "/galleries/:galleryId/purge",
+    protect,
+    requireAdmin,
+    purgeAdminGallery
+)
+
+router.get(
+    "/moderation/flagged-finals",
+    protect,
+    requireAdmin,
+    listModerationFlaggedFinals
+)
+
+router.get("/trash", protect, requireAdmin, listAdminTrash)
+router.post("/trash/purge-expired", protect, requireAdmin, purgeAdminExpiredTrash)
+router.post(
+    "/photographers/:userId/trash/empty",
+    protect,
+    requireAdmin,
+    emptyAdminStudioTrash
+)
+
+/* Aggregate CRM */
+router.get("/crm/studios", protect, requireAdmin, listStudioClientTotals)
+router.get(
+    "/crm/studios/:userId",
+    protect,
+    requireAdmin,
+    getStudioCrmSummary
+)
+router.get("/crm/bookings", protect, requireAdmin, listAdminBookingsCalendar)
+
+/* Billing admin */
+router.get("/billing/plans", protect, requireAdmin, listAdminPlans)
+router.patch(
+    "/billing/plans/:planId",
+    protect,
+    requireAdmin,
+    updateAdminPlan
+)
+router.get("/billing/events", protect, requireAdmin, listAdminBillingEvents)
 
 export default router

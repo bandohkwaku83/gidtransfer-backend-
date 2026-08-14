@@ -22,6 +22,7 @@ import {
     loadActiveSessionCounts,
     loadLatestSessionsByUser,
 } from "../utils/userSessions.js"
+import { cacheDeletePrefix } from "../utils/memoryCache.js"
 
 const findPhotographer = async (userId) => {
     if (!mongoose.isValidObjectId(userId)) {
@@ -267,6 +268,7 @@ export const verifyPhotographerEmail = async (req, res) => {
             user.emailVerificationExpires = undefined
             user.emailVerificationSentAt = undefined
             await user.save()
+            cacheDeletePrefix(`auth:user:${user._id}:`)
         }
 
         return res.status(200).json({

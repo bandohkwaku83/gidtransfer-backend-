@@ -4,27 +4,41 @@ Backend media delivery for faster perceived loading and adaptive video playback.
 
 ## Images — Progressive JPEG
 
-Grid thumbnails and JPEG watermarked previews are encoded as **progressive JPEG** (mozjpeg). Browsers paint a rough full-frame early, then refine — faster perceived load.
+Grid thumbnails and JPEG watermarked previews are encoded as **progressive JPEG** (mozjpeg). Browsers paint a rough full-frame early, then refine — faster perceived load than camera originals (baseline JPEG), which paint **top-to-bottom**.
 
 | Env | Default | Purpose |
 |-----|---------|---------|
-| `GALLERY_THUMB_MAX_PX` | `1200` | Enable thumbs (set `0` to disable); min 320 when on |
+| `GALLERY_THUMB_MAX_PX` | `800` | Enable thumbs (set `0` to disable); min 320 when on |
 | `GALLERY_THUMB_JPEG_QUALITY` | `82` | Thumb quality (faster encode + smaller files) |
 | `GALLERY_PREVIEW_JPEG_QUALITY` | `90` | Watermarked preview JPEG quality |
 
-Thumbs are always `*-thumb.jpg` (progressive), even when the original is PNG/WebP.
+Thumbs are always `*-thumb.jpg` (progressive). Watermarked previews are always `*-preview-wm.jpg` (progressive), even when the original is PNG/WebP.
 
-Original masters are **not** re-encoded.
+Original masters are **not** re-encoded — do **not** use `url` for gallery grids.
 
-### Client usage
+### Which URL to use
 
-Prefer `thumbUrl` for grid tiles. Fall back to `url` / `gridUrl` until `derivativesReady === true`.
+| UI surface | Field | Notes |
+|------------|-------|-------|
+| Grid / masonry tiles | **`gridUrl`** | Progressive thumb when ready; poster for video; falls back to `url` until `derivativesReady` |
+| Same as grid (explicit) | `thumbUrl` | Present once the thumb exists |
+| Lightbox / full view | `viewUrl` or `displayUrl` | Watermarked progressive preview when enabled; else master |
+| Download / master | `url` | Full original — slow top-to-bottom paint; never for grids |
 
+```js
+// Grid tile
+img.src = photo.gridUrl || photo.thumbUrl || photo.url
+
+// Lightbox
+img.src = photo.viewUrl || photo.displayUrl || photo.url
+```
+
+Until `derivativesReady === true`, `gridUrl` may still equal `url` — show a neutral placeholder / skeleton so the UI does not flash a giant baseline JPEG.
 ---
 
 ## Video — FFmpeg MPEG-DASH
 
-After a video upload (raws or finals), the API packages multi-bitrate **DASH** in the background and extracts a progressive JPEG **poster**.
+After a **video** upload (`POST …/uploads/videos` or a video file on the legacy mixed route), the API packages multi-bitrate **DASH** in the background and extracts a progressive JPEG **poster**.
 
 Requires **FFmpeg** on the API host (`ffmpeg` on `PATH`, or `FFMPEG_PATH`).
 
@@ -46,7 +60,7 @@ Requires **FFmpeg** on the API host (`ffmpeg` on `PATH`, or `FFMPEG_PATH`).
 | `dashUrl` | MPEG-DASH manifest (`.mpd`) for adaptive players |
 | `dashStatus` | `pending` \| `processing` \| `ready` \| `failed` \| `skipped` |
 | `streamingReady` | `true` when packaging finished or not applicable |
-| `gridUrl` | Poster when ready for videos; else original `url` |
+| `gridUrl` | Progressive thumb (images) or poster (videos) when ready; else `url` |
 
 Example (ready):
 

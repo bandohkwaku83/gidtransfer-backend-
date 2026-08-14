@@ -10,124 +10,162 @@ const emptyGalleryUsage = () => ({
     rawsBytes: 0,
     selectionsBytes: 0,
     finalsBytes: 0,
+    videoBytes: 0,
     totalBytes: 0,
 })
 
-export const getOwnerStorageBreakdown = async (ownerId, galleryIds = null) => {
-    const ids =
-        galleryIds ??
-        (
-            await Gallery.find({
-                ...galleryOwnerFilter(ownerId),
-                ...galleryNotDeletedFilter(),
-            })
-                .select("_id")
-                .lean()
-        ).map((g) => g._id)
+const emptyBreakdown = () => ({
+    rawsBytes: 0,
+    selectionsBytes: 0,
+    finalsBytes: 0,
+    totalBytes: 0,
+    videoUsedBytes: 0,
+})
 
-    const [photoRawAgg, photoSelectionAgg, finalAgg] = await Promise.all([
-        ids.length
-            ? GalleryPhoto.aggregate([
-                  {
-                      $match: {
-                          gallery: { $in: ids },
-                          deletedAt: null,
-                          selectedByClient: { $ne: true },
+const resolveGalleryIds = async (ownerId, galleryIds) => {
+    if (galleryIds) return galleryIds
+    const rows = await Gallery.find({
+        ...galleryOwnerFilter(ownerId),
+        ...galleryNotDeletedFilter(),
+    })
+        .select("_id")
+        .lean()
+    return rows.map((g) => g._id)
+}
+
+const recomputeGalleryTotal = (usage) => {
+    usage.totalBytes =
+        usage.rawsBytes + usage.selectionsBytes + usage.finalsBytes
+    return usage
+}
+
+/**
+ * Plan storage = non-video proofs/selections/finals.
+ * Video storage = isVideo media (separate plan cap).
+ */
+export const getOwnerStorageByGallery = async (ownerId, galleryIds = null) => {
+    const ids = await resolveGalleryIds(ownerId, galleryIds)
+
+    const [photoRawAgg, photoSelectionAgg, finalAgg, videoPhotoAgg, videoFinalAgg] =
+        await Promise.all([
+            ids.length
+                ? GalleryPhoto.aggregate([
+                      {
+                          $match: {
+                              gallery: { $in: ids },
+                              deletedAt: null,
+                              isVideo: { $ne: true },
+                              selectedByClient: { $ne: true },
+                          },
                       },
-                  },
-                  {
-                      $group: {
-                          _id: "$gallery",
-                          bytes: { $sum: "$sizeBytes" },
+                      {
+                          $group: {
+                              _id: "$gallery",
+                              bytes: { $sum: "$sizeBytes" },
+                          },
                       },
-                  },
-              ])
-            : [],
-        ids.length
-            ? GalleryPhoto.aggregate([
-                  {
-                      $match: {
-                          gallery: { $in: ids },
-                          selectedByClient: true,
+                  ])
+                : [],
+            ids.length
+                ? GalleryPhoto.aggregate([
+                      {
+                          $match: {
+                              gallery: { $in: ids },
+                              deletedAt: null,
+                              isVideo: { $ne: true },
+                              selectedByClient: true,
+                          },
                       },
-                  },
-                  {
-                      $group: {
-                          _id: "$gallery",
-                          bytes: { $sum: "$sizeBytes" },
+                      {
+                          $group: {
+                              _id: "$gallery",
+                              bytes: { $sum: "$sizeBytes" },
+                          },
                       },
-                  },
-              ])
-            : [],
-        ids.length
-            ? GalleryFinal.aggregate([
-                  {
-                      $match: {
-                          gallery: { $in: ids },
-                          deletedAt: null,
+                  ])
+                : [],
+            ids.length
+                ? GalleryFinal.aggregate([
+                      {
+                          $match: {
+                              gallery: { $in: ids },
+                              deletedAt: null,
+                              isVideo: { $ne: true },
+                          },
                       },
-                  },
-                  {
-                      $group: {
-                          _id: "$gallery",
-                          bytes: { $sum: "$sizeBytes" },
+                      {
+                          $group: {
+                              _id: "$gallery",
+                              bytes: { $sum: "$sizeBytes" },
+                          },
                       },
-                  },
-              ])
-            : [],
-    ])
+                  ])
+                : [],
+            ids.length
+                ? GalleryPhoto.aggregate([
+                      {
+                          $match: {
+                              gallery: { $in: ids },
+                              deletedAt: null,
+                              isVideo: true,
+                          },
+                      },
+                      {
+                          $group: {
+                              _id: "$gallery",
+                              bytes: { $sum: "$sizeBytes" },
+                          },
+                      },
+                  ])
+                : [],
+            ids.length
+                ? GalleryFinal.aggregate([
+                      {
+                          $match: {
+                              gallery: { $in: ids },
+                              deletedAt: null,
+                              isVideo: true,
+                          },
+                      },
+                      {
+                          $group: {
+                              _id: "$gallery",
+                              bytes: { $sum: "$sizeBytes" },
+                          },
+                      },
+                  ])
+                : [],
+        ])
 
     const usageByGallery = new Map()
 
-    for (const row of photoRawAgg) {
+    const bump = (row, field) => {
         const galleryId = String(row._id)
         const usage = usageByGallery.get(galleryId) ?? emptyGalleryUsage()
-
-        usage.rawsBytes += row.bytes
-        usage.totalBytes =
-            usage.rawsBytes + usage.selectionsBytes + usage.finalsBytes
-
-        usageByGallery.set(galleryId, usage)
+        usage[field] += Number(row.bytes) || 0
+        usageByGallery.set(galleryId, recomputeGalleryTotal(usage))
     }
 
-    for (const row of photoSelectionAgg) {
-        const galleryId = String(row._id)
-        const usage = usageByGallery.get(galleryId) ?? emptyGalleryUsage()
+    for (const row of photoRawAgg) bump(row, "rawsBytes")
+    for (const row of photoSelectionAgg) bump(row, "selectionsBytes")
+    for (const row of finalAgg) bump(row, "finalsBytes")
+    for (const row of videoPhotoAgg) bump(row, "videoBytes")
+    for (const row of videoFinalAgg) bump(row, "videoBytes")
 
-        usage.selectionsBytes += row.bytes
-        usage.totalBytes =
-            usage.rawsBytes + usage.selectionsBytes + usage.finalsBytes
-
-        usageByGallery.set(galleryId, usage)
+    const breakdown = emptyBreakdown()
+    for (const usage of usageByGallery.values()) {
+        breakdown.rawsBytes += usage.rawsBytes
+        breakdown.selectionsBytes += usage.selectionsBytes
+        breakdown.finalsBytes += usage.finalsBytes
+        breakdown.totalBytes += usage.totalBytes
+        breakdown.videoUsedBytes += usage.videoBytes
     }
 
-    for (const row of finalAgg) {
-        const galleryId = String(row._id)
-        const usage = usageByGallery.get(galleryId) ?? emptyGalleryUsage()
+    return { usageByGallery, breakdown, galleryIds: ids }
+}
 
-        usage.finalsBytes += row.bytes
-        usage.totalBytes =
-            usage.rawsBytes + usage.selectionsBytes + usage.finalsBytes
-
-        usageByGallery.set(galleryId, usage)
-    }
-
-    const rows = [...usageByGallery.values()]
-    const breakdown = rows.reduce(
-        (acc, row) => {
-            acc.rawsBytes += row.rawsBytes
-            acc.selectionsBytes += row.selectionsBytes
-            acc.finalsBytes += row.finalsBytes
-            acc.totalBytes += row.totalBytes
-            return acc
-        },
-        {
-            rawsBytes: 0,
-            selectionsBytes: 0,
-            finalsBytes: 0,
-            totalBytes: 0,
-        }
-    )
-
+/** Totals only — plan pool + separate videoUsedBytes. */
+export const getOwnerStorageBreakdown = async (ownerId, galleryIds = null) => {
+    const { breakdown } = await getOwnerStorageByGallery(ownerId, galleryIds)
     return breakdown
 }

@@ -302,6 +302,6 @@ Same password/email cookies. Returns `{ photos, pagination, search: { engine, q,
 ## Local dev
 
 1. Set `OPENAI_API_KEY` in backend `.env`
-2. Optional: `GALLERY_THUMB_MAX_PX=1200`
+2. Optional: `GALLERY_THUMB_MAX_PX=800`
 3. Open public gallery → tap **Start AI suggestions** → poll until `ready`
 4. Frontend: `NEXT_PUBLIC_API_URL=http://127.0.0.1:7100`

@@ -1,5 +1,6 @@
 import { applyWatermarkFieldsToUser } from "../utils/applyWatermarkFields.js"
 import { formatWatermarkResponse, parseWatermarkInput } from "../utils/watermarkFields.js"
+import { sendFeatureDenied, userHasFeature } from "../utils/planFeatures.js"
 
 const handleWatermarkError = (res, error) => {
     if (error.statusCode === 400 || error.statusCode === 409) {
@@ -29,6 +30,14 @@ export const updateWatermarkSettings = async (req, res) => {
         const hasUpload = Boolean(req.file)
         if ((!fields || Object.keys(fields).length === 0) && !hasUpload) {
             return res.status(400).json({ message: "No changes to save" })
+        }
+
+        const wantsBranding =
+            hasUpload ||
+            Boolean(fields?.logoDataUrl) ||
+            fields?.enabled === true
+        if (wantsBranding && !userHasFeature(req.user, "customBranding")) {
+            return sendFeatureDenied(res, "customBranding", { user: req.user })
         }
 
         await applyWatermarkFieldsToUser(req.user, fields ?? {}, {

@@ -41,6 +41,7 @@ import { paystackConfigured } from "./services/paystack.js"
 import { s3Configured, s3PublicReadsViaDirectUrl } from "./utils/s3Storage.js"
 import { createS3UploadsMiddleware } from "./utils/s3UploadsMiddleware.js"
 import { startBookingReminderScheduler } from "./jobs/bookingReminderJob.js"
+import { startSubscriptionRenewalReminderScheduler } from "./jobs/subscriptionRenewalReminderJob.js"
 import { ffmpegAvailable, resolveFfmpegPath } from "./utils/ffmpeg.js"
 import { galleryVideoDashEnabled } from "./utils/galleryVideoDash.js"
 import { galleryThumbMaxPx } from "./utils/previewWatermark.js"
@@ -286,6 +287,51 @@ app.get("/api", (_req, res) => {
                     photographer:
                         "POST /api/admin/photographers/:userId/communicate (JSON: channels sms|email|both, subject, message)",
                 },
+                galleries: {
+                    list:
+                        "GET /api/admin/galleries?slug=&studioEmail=&clientName=&dateFrom=&dateTo=&status=&shared=&trashOnly=&search=&page=&limit=",
+                    get: "GET /api/admin/galleries/:galleryId",
+                    byPhotographer:
+                        "GET /api/admin/photographers/:userId/galleries?status=&trashOnly=&page=&limit=",
+                    revokeShare:
+                        "POST /api/admin/galleries/:galleryId/share/revoke (JSON: reason)",
+                    extendShare:
+                        "POST /api/admin/galleries/:galleryId/share/extend (JSON: days|extendDays, reason)",
+                    patchShare:
+                        "PATCH /api/admin/galleries/:galleryId/share (JSON: allowDownloads, selectionLocked, reason)",
+                    restore:
+                        "POST /api/admin/galleries/:galleryId/restore (JSON: reason)",
+                    purge:
+                        "DELETE /api/admin/galleries/:galleryId/purge (JSON: reason)",
+                },
+                moderation: {
+                    flaggedFinals:
+                        "GET /api/admin/moderation/flagged-finals?ownerId=&page=&limit=",
+                },
+                trash: {
+                    list: "GET /api/admin/trash?ownerId=&page=&limit=",
+                    purgeExpired:
+                        "POST /api/admin/trash/purge-expired (JSON: ownerId?, reason)",
+                    emptyStudio:
+                        "POST /api/admin/photographers/:userId/trash/empty (JSON: reason)",
+                },
+                crm: {
+                    studioClientTotals:
+                        "GET /api/admin/crm/studios?search=&ownerId=&page=&limit=",
+                    studioSummary:
+                        "GET /api/admin/crm/studios/:userId?includePii=&reason=",
+                    bookingsCalendar:
+                        "GET /api/admin/crm/bookings?ownerId=&dateFrom=&dateTo=&shootType=&includePii=&reason=&page=&limit=",
+                },
+                billing: {
+                    plans: "GET /api/admin/billing/plans",
+                    updatePlan:
+                        "PATCH /api/admin/billing/plans/:planId (JSON: storageLimitBytes|storageBytes, maxGalleries, maxTeamMembers, perks, featureKeys, supportTier, priceGhs, name, description, reason)",
+                    limitOverride:
+                        "PUT /api/admin/photographers/:userId/limit-override (JSON: storageLimitBytes, maxGalleries, expiresAt|expiresInDays, reason | clear:true)",
+                    events:
+                        "GET /api/admin/billing/events?category=paid|failed|dispute|other&userId=&eventType=&reference=&page=&limit=",
+                },
                 listSenderIds:
                     "GET /api/admin/sms/sender-ids?status=pending|approved|rejected|all",
                 approveSenderId:
@@ -323,6 +369,11 @@ app.get("/api", (_req, res) => {
                         "POST /api/settings/report-issue (multipart: topic, description; optional attachments)",
                     helpSupport: "GET|POST /api/settings/help-support (alias)",
                 },
+                apiTokens: {
+                    list: "GET /api/settings/api-tokens",
+                    create: "POST /api/settings/api-tokens (JSON: name)",
+                    revoke: "DELETE /api/settings/api-tokens/:tokenId",
+                },
             },
             dashboard: "GET /api/dashboard",
             sync: {
@@ -336,7 +387,7 @@ app.get("/api", (_req, res) => {
             storage: "GET /api/storage?sort=size|name&order=asc|desc",
             billing: {
                 config: "GET /api/billing/config",
-                plans: "GET /api/billing/plans",
+                plans: "GET /api/billing/plans (includes featureCatalog + comparison)",
                 subscription: "GET /api/billing/subscription",
                 checkout: "POST /api/billing/checkout (JSON: planId)",
                 cancel: "POST /api/billing/cancel",
@@ -396,15 +447,27 @@ app.get("/api", (_req, res) => {
                 finalSettings:
                     "PATCH /api/galleries/:id/final-settings (watermarkFinalsEnabled)",
                 uploads: {
-                    list: "GET /api/galleries/:id/uploads?q=&scene=&tag=&suggested=&blurry=&eyesOpen=&minQuality=&page=&limit= (search uses OpenSearch when enabled)",
+                    list: "GET /api/galleries/:id/uploads?mediaType=photo|video&q=&scene=&tag=&suggested=&blurry=&eyesOpen=&minQuality=&page=&limit= (search uses OpenSearch when enabled)",
                     reorder:
                         "PATCH /api/galleries/:id/uploads/reorder (body: photoIds[])",
+                    photosPresign:
+                        "POST /api/galleries/:id/uploads/photos/presign (JSON: files[] — images only)",
+                    photosComplete:
+                        "POST /api/galleries/:id/uploads/photos/complete (JSON: files[] with storedFilename)",
+                    photosUpload:
+                        "POST /api/galleries/:id/uploads/photos (multipart field: photos — local dev only when S3 is off)",
+                    videosPresign:
+                        "POST /api/galleries/:id/uploads/videos/presign (JSON: files[] — videos only)",
+                    videosComplete:
+                        "POST /api/galleries/:id/uploads/videos/complete (JSON: files[] with storedFilename)",
+                    videosUpload:
+                        "POST /api/galleries/:id/uploads/videos (multipart field: videos — local dev only when S3 is off)",
                     presign:
-                        "POST /api/galleries/:id/uploads/presign (JSON: files[] with originalFilename, mimeType, sizeBytes — returns presigned S3 PUT URLs)",
+                        "POST /api/galleries/:id/uploads/presign (legacy mixed — optional mediaType photo|video)",
                     complete:
-                        "POST /api/galleries/:id/uploads/complete (JSON: files[] with storedFilename from presign — registers uploads; thumbnails generated in background)",
+                        "POST /api/galleries/:id/uploads/complete (legacy mixed — optional mediaType photo|video)",
                     upload:
-                        "POST /api/galleries/:id/uploads (multipart — local dev only when S3 is not configured)",
+                        "POST /api/galleries/:id/uploads (legacy mixed multipart field photos — local dev only when S3 is not configured)",
                     bulkDelete: "POST /api/galleries/:id/uploads/bulk-delete",
                     delete: "DELETE /api/galleries/:id/uploads/:photoId",
                     restore: "POST /api/galleries/:id/uploads/:photoId/restore",
@@ -528,6 +591,11 @@ mongoose
             await User.syncIndexes()
             const { default: Booking } = await import("./models/Booking.js")
             await Booking.syncIndexes()
+            const { default: PlanConfig } = await import("./models/PlanConfig.js")
+            const { loadPlanCatalogOverridesFromDb } = await import(
+                "./utils/planCatalog.js"
+            )
+            await loadPlanCatalogOverridesFromDb(PlanConfig)
             const accountIdsMigrated = await migrateMissingAccountIds()
             if (accountIdsMigrated > 0) {
                 console.log(
@@ -595,6 +663,7 @@ mongoose
         setInterval(runTrashPurge, 60 * 60 * 1000)
 
         startBookingReminderScheduler()
+        startSubscriptionRenewalReminderScheduler()
 
         app.listen(PORT, () => {
             console.log(`Photo Global Admin API listening on port ${PORT}`)

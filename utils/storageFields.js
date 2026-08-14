@@ -12,18 +12,25 @@ export const formatBytesLabel = (bytes) => {
     return `${bytes} B`
 }
 
-import { getPlanById, getUserPlanId } from "./planCatalog.js"
+import {
+    getEffectiveStorageLimitBytes,
+    getPlanById,
+    getUserPlanId,
+} from "./planCatalog.js"
 
 export const getPlanSummary = (user) => {
     const planId = user ? getUserPlanId(user) : "free"
     const plan = getPlanById(planId) ?? getPlanById("free")
+    const storageLimitBytes = user
+        ? getEffectiveStorageLimitBytes(user)
+        : plan.storageLimitBytes
 
     return {
         planId: plan.id,
         planName: plan.name,
         planLabel: `${plan.name} plan`,
-        storageLimitBytes: plan.storageLimitBytes,
-        storageLabel: formatBytesLabel(plan.storageLimitBytes),
+        storageLimitBytes,
+        storageLabel: formatBytesLabel(storageLimitBytes),
     }
 }
 

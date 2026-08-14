@@ -13,6 +13,13 @@ const handleStudioError = (res, error) => {
                 : "This SMS display name is already taken",
         })
     }
+    if (error.statusCode === 403) {
+        return res.status(403).json({
+            message: error.message,
+            code: error.code || "PLAN_FEATURE_REQUIRED",
+            feature: error.feature || "customSmsSender",
+        })
+    }
     if (error.statusCode === 400 || error.statusCode === 409) {
         return res.status(error.statusCode).json({ message: error.message })
     }
@@ -29,6 +36,7 @@ export const completeOnboarding = async (req, res) => {
 
         await applyStudioFieldsToUser(req.user, fields, {
             uploadedFile: req.file,
+            allowCustomSmsSender: true,
         })
         await req.user.save()
 
@@ -69,6 +77,7 @@ export const updateStudio = async (req, res) => {
         const { emailChanged } = await applyStudioFieldsToUser(req.user, fields, {
             uploadedFile: req.file,
             partial: true,
+            allowCustomSmsSender: true,
         })
         await req.user.save()
 

@@ -3,6 +3,7 @@ import { attachGalleryCounts } from "../utils/galleryFields.js"
 import { formatUserResponse } from "../utils/formatUserResponse.js"
 import { getOwnerStorageBreakdown } from "../utils/storageUsage.js"
 import { getPlanSummary } from "../utils/storageFields.js"
+import { getEffectiveVideoUploadLimitBytes } from "../utils/planCatalog.js"
 import { cacheGetOrSet } from "../utils/memoryCache.js"
 import {
     buildOwnerActivitySeries,
@@ -65,10 +66,15 @@ export const getDashboard = async (req, res) => {
                 ])
 
                 const plan = getPlanSummary(req.user)
+                const videoLimitBytes = getEffectiveVideoUploadLimitBytes(req.user)
 
                 return {
                     stats: formatDashboardStats(clientCount, galleryCounts),
-                    storage: formatDashboardStorage(storageBreakdown, plan),
+                    storage: formatDashboardStorage(
+                        storageBreakdown,
+                        plan,
+                        videoLimitBytes
+                    ),
                     weeklyActivity: {
                         ...weeklyActivity,
                         chart: activitySeries,

@@ -22,6 +22,12 @@ import {
 import { parseDirectUploadFiles } from "../utils/directUploadHelpers.js"
 import { s3Configured } from "../utils/s3Storage.js"
 import { scheduleGalleryVideoDash } from "../utils/galleryVideoQueue.js"
+import { userHasFeature } from "../utils/planFeatures.js"
+import {
+    sendVideoUploadDenied,
+    videoBytesFromFiles,
+    videoUploadDeniedPayload,
+} from "../utils/planVideoUploads.js"
 import {
     GALLERY_MEDIA_SORT,
     getNextGalleryMediaSortOrder,
@@ -137,6 +143,12 @@ export const presignGalleryFinalUploads = async (req, res) => {
             }
         }
 
+        const incomingVideo = videoBytesFromFiles(parsed.files)
+        if (incomingVideo > 0) {
+            const denied = await videoUploadDeniedPayload(req.user, incomingVideo)
+            if (denied) return sendVideoUploadDenied(res, denied)
+        }
+
         const uploads = await Promise.all(
             parsed.files.map(async (file) => {
                 const presigned = await createGalleryFinalPresignedUpload({
@@ -197,6 +209,12 @@ export const completeGalleryFinalUploads = async (req, res) => {
             }
         }
 
+        const incomingVideo = videoBytesFromFiles(parsed.files)
+        if (incomingVideo > 0) {
+            const denied = await videoUploadDeniedPayload(req.user, incomingVideo)
+            if (denied) return sendVideoUploadDenied(res, denied)
+        }
+
         const verifyResults = await Promise.all(
             parsed.files.map(async (file) => ({
                 file,
@@ -244,7 +262,11 @@ export const completeGalleryFinalUploads = async (req, res) => {
                 mimeType: file.mimeType,
                 sizeBytes: file.sizeBytes,
                 isVideo,
-                dashStatus: isVideo ? "pending" : null,
+                dashStatus: isVideo
+                    ? userHasFeature(req.user, "videoDash")
+                        ? "pending"
+                        : "skipped"
+                    : null,
                 clientPaid,
                 outstandingBalanceGhs,
                 isLocked,
@@ -252,15 +274,17 @@ export const completeGalleryFinalUploads = async (req, res) => {
                 ...(uploadSetId !== undefined ? { set: uploadSetId } : {}),
             })
             nextSortOrder += 1
-            scheduleGalleryVideoDash({
-                kind: "final",
-                mediaId: row._id,
-                galleryId: gallery._id,
-                storedFilename: file.storedFilename,
-                mimeType: file.mimeType,
-                sizeBytes: file.sizeBytes,
-                isVideo,
-            })
+            if (userHasFeature(req.user, "videoDash")) {
+                scheduleGalleryVideoDash({
+                    kind: "final",
+                    mediaId: row._id,
+                    galleryId: gallery._id,
+                    storedFilename: file.storedFilename,
+                    mimeType: file.mimeType,
+                    sizeBytes: file.sizeBytes,
+                    isVideo,
+                })
+            }
             created.push(formatGalleryFinalResponse(row))
         }
 
@@ -292,6 +316,12 @@ export const uploadGalleryFinals = async (req, res) => {
         const files = req.files ?? []
         if (!files.length) {
             return res.status(400).json({ message: "No finals provided" })
+        }
+
+        const incomingVideo = videoBytesFromFiles(files)
+        if (incomingVideo > 0) {
+            const denied = await videoUploadDeniedPayload(req.user, incomingVideo)
+            if (denied) return sendVideoUploadDenied(res, denied)
         }
 
         const setResolved = await resolveGallerySetIdForUpload(gallery._id, req.body)
@@ -330,7 +360,11 @@ export const uploadGalleryFinals = async (req, res) => {
                 mimeType: file.mimetype,
                 sizeBytes: file.size,
                 isVideo: saved.isVideo,
-                dashStatus: saved.isVideo ? "pending" : null,
+                dashStatus: saved.isVideo
+                    ? userHasFeature(req.user, "videoDash")
+                        ? "pending"
+                        : "skipped"
+                    : null,
                 clientPaid,
                 outstandingBalanceGhs,
                 isLocked,
@@ -338,15 +372,17 @@ export const uploadGalleryFinals = async (req, res) => {
                 ...(uploadSetId !== undefined ? { set: uploadSetId } : {}),
             })
             nextSortOrder += 1
-            scheduleGalleryVideoDash({
-                kind: "final",
-                mediaId: row._id,
-                galleryId: gallery._id,
-                storedFilename: saved.storedFilename,
-                mimeType: file.mimetype,
-                sizeBytes: file.size,
-                isVideo: saved.isVideo,
-            })
+            if (userHasFeature(req.user, "videoDash")) {
+                scheduleGalleryVideoDash({
+                    kind: "final",
+                    mediaId: row._id,
+                    galleryId: gallery._id,
+                    storedFilename: saved.storedFilename,
+                    mimeType: file.mimetype,
+                    sizeBytes: file.size,
+                    isVideo: saved.isVideo,
+                })
+            }
             created.push(formatGalleryFinalResponse(row))
         }
 

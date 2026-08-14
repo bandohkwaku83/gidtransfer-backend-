@@ -2,6 +2,7 @@ import { suggestCompanySlugFromName } from "./gallerySlugHelpers.js"
 import { studioUrlDisplay } from "./studioUrl.js"
 import { formatSmsSenderFields } from "./studioSms.js"
 import { formatEmailNotificationsResponse } from "./emailNotificationFields.js"
+import { getPlanSummaryForUser } from "./subscriptionFields.js"
 
 export const publicApiBase = () =>
     (process.env.API_PUBLIC_URL || `http://127.0.0.1:${process.env.PORT || 7100}`).replace(
@@ -137,6 +138,8 @@ export const formatUserResponse = (user) => {
           }
         : null
 
+    const planSummary = getPlanSummaryForUser(doc)
+
     return {
         _id: doc._id,
         accountId: doc.accountId?.trim() || null,
@@ -159,9 +162,30 @@ export const formatUserResponse = (user) => {
                 phone &&
                 companySlug &&
                 primaryDeliverable &&
-                country &&
-                studio.smsSenderId?.trim()
+                country
         ),
         studio: shapedStudio,
+        plan: {
+            planId: planSummary.planId,
+            planName: planSummary.planName,
+            planLabel: planSummary.planLabel,
+            storageLimitBytes: planSummary.storageLimitBytes,
+            storageLabel: planSummary.storageLabel,
+            maxGalleries: planSummary.maxGalleries,
+            maxTeamMembers: planSummary.maxTeamMembers,
+            videoUploadLimitBytes: planSummary.videoUploadLimitBytes,
+            videoUploadLimitLabel: planSummary.videoUploadLimitLabel,
+            perks: planSummary.perks,
+            features: planSummary.features,
+            featureKeys: planSummary.featureKeys,
+            supportTier: planSummary.supportTier,
+            priceGhs: planSummary.priceGhs,
+            interval: planSummary.interval,
+            trialDays: planSummary.trialDays,
+            trialEndsAt: planSummary.trialEndsAt,
+            trialActive: planSummary.trialActive,
+            trialExpired: planSummary.trialExpired,
+            subscription: planSummary.subscription,
+        },
     }
 }

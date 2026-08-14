@@ -87,6 +87,15 @@ export const createPaystackPlan = async ({
         description,
     })
 
+export const fetchPaystackPlan = async (planCodeOrId) =>
+    paystackRequest("GET", `/plan/${encodeURIComponent(planCodeOrId)}`)
+
+export const listPaystackPlans = async ({ page = 1, perPage = 50 } = {}) =>
+    paystackRequest(
+        "GET",
+        `/plan?page=${encodeURIComponent(page)}&perPage=${encodeURIComponent(perPage)}`
+    )
+
 export const initializePaystackSubscription = async ({
     customer,
     plan,
@@ -100,7 +109,11 @@ export const initializePaystackSubscription = async ({
         authorization,
     })
 
-/** First payment / plan switch — user enters card on Paystack checkout page. */
+/**
+ * First payment / plan switch — hosted Paystack checkout.
+ * Subscriptions need a reusable authorization, so prefer card (+ MoMo in GHS).
+ * Bank transfer is intentionally omitted: it cannot power recurring plan charges.
+ */
 export const initializePaystackTransaction = async ({
     email,
     plan,
@@ -108,14 +121,18 @@ export const initializePaystackTransaction = async ({
     metadata,
     callbackUrl,
     reference,
+    currency = "GHS",
+    channels = ["card", "mobile_money"],
 }) =>
     paystackRequest("POST", "/transaction/initialize", {
         email,
         plan,
         amount: amountPesewas,
+        currency,
         metadata,
         callback_url: callbackUrl || undefined,
         reference: reference || undefined,
+        channels,
     })
 
 export const fetchPaystackSubscription = async (subscriptionCodeOrId) =>

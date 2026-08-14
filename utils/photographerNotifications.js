@@ -8,14 +8,16 @@ import {
     gallerySelectionsSubmittedEmail,
     passwordResetEmail,
     emailVerificationOtpEmail,
+    planUpgradedEmail,
+    planRenewalReminderEmail,
 } from "./emailTemplates.js"
 import {
     bookingDetailUrl,
     galleryDetailUrl,
+    billingUrl,
 } from "./appLinks.js"
 import { photographerWantsEmail } from "./emailNotificationFields.js"
 import {
-    buildBookingIcs,
     buildBookingIcsAttachment,
     buildGoogleCalendarUrl,
 } from "./bookingCalendar.js"
@@ -206,6 +208,52 @@ export const notifyPhotographerSelectionsSubmitted = async ({
     })
 
     return sendToPhotographer(user, "gallery_selections", () => payload)
+}
+
+export const notifyPhotographerPlanUpgraded = async ({
+    user: preloadedUser,
+    ownerId,
+    planName,
+    priceGhs,
+    renewalDateLabel,
+    upgradedAtLabel,
+}) => {
+    const user = preloadedUser ?? (await loadPhotographer(ownerId))
+    const companySlug = user?.studio?.companySlug
+    const studioName = user?.studio?.companyName?.trim() || "there"
+    const payload = planUpgradedEmail({
+        studioName,
+        planName,
+        priceGhs,
+        renewalDateLabel,
+        upgradedAtLabel,
+        actionUrl: billingUrl(companySlug),
+    })
+
+    return sendToPhotographer(user, "billing_upgrade", () => payload)
+}
+
+export const notifyPhotographerPlanRenewalReminder = async ({
+    user: preloadedUser,
+    ownerId,
+    planName,
+    priceGhs,
+    renewalDateLabel,
+    daysLeft = 10,
+}) => {
+    const user = preloadedUser ?? (await loadPhotographer(ownerId))
+    const companySlug = user?.studio?.companySlug
+    const studioName = user?.studio?.companyName?.trim() || "there"
+    const payload = planRenewalReminderEmail({
+        studioName,
+        planName,
+        priceGhs,
+        renewalDateLabel,
+        daysLeft,
+        actionUrl: billingUrl(companySlug),
+    })
+
+    return sendToPhotographer(user, "billing_renewal_reminder", () => payload)
 }
 
 export const sendPasswordResetEmail = async ({ email, resetUrl }) => {

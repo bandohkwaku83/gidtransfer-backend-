@@ -140,28 +140,24 @@ export function recordGalleryAnalyticsEvent(galleryId, type, { finalId = null } 
     })
 }
 
-export async function buildGalleryAnalytics(galleryId) {
+export async function buildGalleryAnalytics(
+    galleryId,
+    { advanced = true } = {}
+) {
     const stats = await attachGalleryStats(galleryId)
     const { uploadCount, selectionCount, finalCount } = stats
 
-    const [linkViews, clientDownloads, activity] = await Promise.all([
-        GalleryAnalyticsEvent.countDocuments({
-            gallery: galleryId,
-            type: "link_view",
-        }),
-        GalleryAnalyticsEvent.countDocuments({
-            gallery: galleryId,
-            type: "client_download",
-        }),
-        buildActivitySeries(galleryId),
-    ])
+    const linkViews = await GalleryAnalyticsEvent.countDocuments({
+        gallery: galleryId,
+        type: "link_view",
+    })
 
     const selectionRate =
         uploadCount > 0 ? Math.round((selectionCount / uploadCount) * 100) : 0
 
-    return {
+    const basic = {
+        tier: advanced ? "advanced" : "basic",
         linkViews,
-        clientDownloads,
         clientPicks: selectionCount,
         selectionRate,
         mediaBreakdown: {
@@ -170,6 +166,23 @@ export async function buildGalleryAnalytics(galleryId) {
             finals: finalCount,
             total: uploadCount + selectionCount + finalCount,
         },
+    }
+
+    if (!advanced) {
+        return basic
+    }
+
+    const [clientDownloads, activity] = await Promise.all([
+        GalleryAnalyticsEvent.countDocuments({
+            gallery: galleryId,
+            type: "client_download",
+        }),
+        buildActivitySeries(galleryId),
+    ])
+
+    return {
+        ...basic,
+        clientDownloads,
         activity,
         range: {
             from: startOfDay(new Date(Date.now() - (ACTIVITY_DAY_COUNT - 1) * 86400000)),

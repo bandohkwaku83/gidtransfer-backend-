@@ -207,6 +207,18 @@
     {
       "key": "issueReportId",
       "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "planId",
+      "value": "pro"
+    },
+    {
+      "key": "userId",
+      "value": ""
     }
   ],
   "item": [
@@ -216,7 +228,9 @@
         {
           "name": "Root",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/"
@@ -226,7 +240,9 @@
         {
           "name": "Health",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/health"
@@ -236,7 +252,9 @@
         {
           "name": "API index",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api"
@@ -273,9 +291,16 @@
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"acceptedTerms\": true\n}"
@@ -311,9 +336,16 @@
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
@@ -346,9 +378,16 @@
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"idToken\": \"<paste-google-id-token>\"\n}"
@@ -361,9 +400,16 @@
         {
           "name": "Forgot password",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"{{email}}\"\n}"
@@ -390,9 +436,16 @@
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"token\": \"<paste-reset-token-from-terminal>\",\n  \"password\": \"{{password}}\"\n}"
@@ -498,7 +551,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"code\": \"123456\"\n}"
@@ -546,7 +604,9 @@
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
             "description": "Clears `token` before switching users or re-login. Does not call the API.",
@@ -875,7 +935,7 @@
     },
     {
       "name": "Admin",
-      "description": "Platform admin JWT (`adminToken`). Run **Admin login** first.",
+      "description": "Platform admin JWT (`adminToken`). Run **Admin login** first.\n\nIncludes photographers, gallery inspector, moderation/trash, CRM aggregates, messaging, billing plans/overrides/events, issue reports, and SMS sender IDs.",
       "item": [
         {
           "name": "Admin login",
@@ -895,7 +955,9 @@
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
             "header": [
               {
@@ -909,175 +971,558 @@
             },
             "url": "{{baseUrl}}/api/admin/auth/login"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"123456\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/auth/login"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Login successful\",\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.admin.sample\",\n  \"admin\": {\n    \"_id\": \"665f0a1b2c3d4e5f67890001\",\n    \"email\": \"admin@example.com\",\n    \"name\": \"Platform Admin\",\n    \"role\": \"admin\",\n    \"isActive\": true,\n    \"createdAt\": \"2026-01-01T00:00:00.000Z\",\n    \"updatedAt\": \"2026-01-01T00:00:00.000Z\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Admin stats",
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/admin/stats"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/stats"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"photographers\": {\n    \"total\": 128,\n    \"onboarded\": 96,\n    \"emailVerified\": 110,\n    \"active\": 120,\n    \"byPlan\": {\n      \"free\": 80,\n      \"starter\": 20,\n      \"pro\": 18,\n      \"studio\": 10\n    },\n    \"bySubscriptionStatus\": {\n      \"free\": 80,\n      \"active\": 40,\n      \"past_due\": 5,\n      \"pending\": 3\n    },\n    \"bySmsSenderStatus\": {\n      \"none\": 40,\n      \"approved\": 70,\n      \"pending\": 10,\n      \"rejected\": 8\n    },\n    \"byAuthProvider\": {\n      \"email\": 100,\n      \"google\": 28\n    }\n  },\n  \"clients\": {\n    \"total\": 1540\n  },\n  \"galleries\": {\n    \"total\": 890,\n    \"byStatus\": {\n      \"draft\": 120,\n      \"selecting\": 400,\n      \"done\": 370\n    }\n  },\n  \"support\": {\n    \"openIssueReports\": 7,\n    \"pendingSmsSenders\": 10\n  }\n}"
+            }
+          ]
         },
         {
           "name": "List photographers",
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/admin/photographers?onboarded=true&sort=lastLoginAt&order=desc"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/photographers?onboarded=true&sort=lastLoginAt&order=desc"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"items\": [\n    {\n      \"userId\": \"665f0a1b2c3d4e5f67890123\",\n      \"accountId\": \"GT-10042\",\n      \"email\": \"studio@example.com\",\n      \"emailVerified\": true,\n      \"authProvider\": \"email\",\n      \"isActive\": true,\n      \"agreedToTermsAt\": \"2026-02-01T12:00:00.000Z\",\n      \"onboardingComplete\": true,\n      \"onboardingCompletedAt\": \"2026-02-02T09:00:00.000Z\",\n      \"companyName\": \"Bizzles Photography\",\n      \"companySlug\": \"bizzles\",\n      \"country\": \"GH\",\n      \"phone\": \"+233241234567\",\n      \"primaryDeliverable\": \"photos\",\n      \"smsSenderId\": \"BIZZLES\",\n      \"smsSenderStatus\": \"approved\",\n      \"planId\": \"pro\",\n      \"planName\": \"Pro\",\n      \"subscriptionStatus\": \"active\",\n      \"activity\": {\n        \"lastLoginAt\": \"2026-07-27T18:00:00.000Z\",\n        \"lastSeenAt\": \"2026-07-27T19:10:00.000Z\",\n        \"loginCount\": 42,\n        \"activeSessions\": 1,\n        \"latestSession\": {\n          \"id\": \"665f0a1b2c3d4e5f6789sess\",\n          \"createdAt\": \"2026-07-27T18:00:00.000Z\",\n          \"lastSeenAt\": \"2026-07-27T19:10:00.000Z\",\n          \"ip\": \"127.0.0.1\",\n          \"userAgent\": \"Mozilla/5.0\"\n        }\n      },\n      \"createdAt\": \"2026-02-01T12:00:00.000Z\",\n      \"updatedAt\": \"2026-07-27T19:10:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 50,\n    \"total\": 1,\n    \"totalPages\": 1,\n    \"hasMore\": false\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Get photographer",
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/admin/photographers/{{userId}}?sessionLimit=10"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/photographers/{{userId}}?sessionLimit=10"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"userId\": \"665f0a1b2c3d4e5f67890123\",\n  \"email\": \"studio@example.com\",\n  \"onboardingComplete\": true,\n  \"subscription\": {\n    \"planId\": \"pro\",\n    \"planName\": \"Pro\",\n    \"storageLimitBytes\": 214748364800,\n    \"storageLabel\": \"200 GB\",\n    \"maxGalleries\": 50,\n    \"perks\": [\n      \"100 GB storage\",\n      \"Unlimited galleries\",\n      \"Priority support\",\n      \"Custom branding\"\n    ],\n    \"priceGhs\": 199,\n    \"interval\": \"monthly\",\n    \"status\": \"active\",\n    \"currentPeriodEnd\": \"2026-08-28T00:00:00.000Z\",\n    \"cancelAtPeriodEnd\": false,\n    \"pendingPlanId\": null,\n    \"paystackSubscriptionCode\": \"SUB_sample\",\n    \"canManage\": true,\n    \"limitOverride\": {\n      \"storageLimitBytes\": 214748364800,\n      \"maxGalleries\": 50,\n      \"expiresAt\": \"2026-08-27T04:00:00.000Z\",\n      \"reason\": \"Temporary bump for launch week\",\n      \"setAt\": \"2026-07-28T04:00:00.000Z\"\n    },\n    \"paystackCustomerCode\": \"CUS_sample\"\n  },\n  \"usage\": {\n    \"clientCount\": 48,\n    \"galleries\": {\n      \"all\": 12,\n      \"draft\": 2,\n      \"selecting\": 5,\n      \"done\": 5,\n      \"trash\": 1\n    },\n    \"storageBytes\": 53687091200,\n    \"storageLabel\": \"50 GB\",\n    \"storageLimitBytes\": 214748364800,\n    \"storageLimitLabel\": \"200 GB\",\n    \"maxGalleries\": 50\n  },\n  \"activity\": {\n    \"lastLoginAt\": \"2026-07-27T18:00:00.000Z\",\n    \"lastSeenAt\": \"2026-07-27T19:10:00.000Z\",\n    \"loginCount\": 42,\n    \"activeSessions\": 1,\n    \"tokenVersion\": 3\n  },\n  \"recentSessions\": []\n}"
+            }
+          ]
         },
         {
           "name": "List photographer sessions",
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/sessions"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/sessions"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"items\": [\n    {\n      \"id\": \"665f0a1b2c3d4e5f6789sess\",\n      \"createdAt\": \"2026-07-27T18:00:00.000Z\",\n      \"lastSeenAt\": \"2026-07-27T19:10:00.000Z\",\n      \"endedAt\": null,\n      \"endReason\": null,\n      \"ip\": \"127.0.0.1\",\n      \"userAgent\": \"Mozilla/5.0\",\n      \"authMethod\": \"email\",\n      \"active\": true\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 20,\n    \"total\": 1,\n    \"totalPages\": 1,\n    \"hasMore\": false\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Activate photographer",
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "PATCH",
             "header": [],
             "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/activate"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/activate"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Photographer activated\",\n  \"isActive\": true\n}"
+            }
+          ]
         },
         {
           "name": "Deactivate photographer",
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "PATCH",
             "header": [],
             "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/deactivate"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/deactivate"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Photographer deactivated\",\n  \"isActive\": false\n}"
+            }
+          ]
         },
         {
           "name": "Verify photographer email",
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "POST",
             "header": [],
             "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/verify-email"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/verify-email"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Photographer email verified\",\n  \"emailVerified\": true,\n  \"emailVerifiedAt\": \"2026-07-28T04:00:00.000Z\"\n}"
+            }
+          ]
         },
         {
           "name": "Communication config",
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/admin/communications/config"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/communications/config"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"sms\": {\n    \"configured\": true,\n    \"defaultSender\": \"GIDTRANSFR\"\n  },\n  \"email\": {\n    \"configured\": true\n  },\n  \"limits\": {\n    \"maxRecipients\": null,\n    \"maxSmsLength\": 480,\n    \"maxEmailMessageLength\": 10000,\n    \"maxSubjectLength\": 200\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Send SMS to photographers",
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"userIds\": [\"{{userId}}\"],\n  \"message\": \"Hello from Gidtransfer admin. This is a platform update.\"\n}"
             },
             "url": "{{baseUrl}}/api/admin/communications/sms"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userIds\": [\"{{userId}}\"],\n  \"message\": \"Hello from Gidtransfer admin. This is a platform update.\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/communications/sms"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"SMS communication processed\",\n  \"communication\": {\n    \"id\": \"665f0a1b2c3d4e5f6789comm1\",\n    \"channel\": \"sms\",\n    \"subject\": \"\",\n    \"message\": \"Hello from Gidtransfer admin. This is a platform update.\",\n    \"summary\": {\n      \"targeted\": 1,\n      \"sent\": 1,\n      \"failed\": 0,\n      \"skipped\": 0\n    },\n    \"recipients\": [\n      {\n        \"userId\": \"665f0a1b2c3d4e5f67890123\",\n        \"email\": \"studio@example.com\",\n        \"phone\": \"+233241234567\",\n        \"companyName\": \"Bizzles Photography\",\n        \"status\": \"sent\"\n      }\n    ],\n    \"createdAt\": \"2026-07-28T04:10:00.000Z\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Send email to photographers",
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"userIds\": [\"{{userId}}\"],\n  \"subject\": \"Important platform update\",\n  \"message\": \"Hi there,\\n\\nWe wanted to share an important update with your studio.\\n\\nThanks for being on Gidtransfer.\"\n}"
             },
             "url": "{{baseUrl}}/api/admin/communications/email"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userIds\": [\"{{userId}}\"],\n  \"subject\": \"Important platform update\",\n  \"message\": \"Hi there,\\n\\nWe wanted to share an important update with your studio.\\n\\nThanks for being on Gidtransfer.\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/communications/email"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Email communication processed\",\n  \"communication\": {\n    \"id\": \"665f0a1b2c3d4e5f6789comm2\",\n    \"channel\": \"email\",\n    \"subject\": \"Important platform update\",\n    \"message\": \"Hi there,\\n\\nWe wanted to share an important update with your studio.\",\n    \"summary\": {\n      \"targeted\": 1,\n      \"sent\": 1,\n      \"failed\": 0,\n      \"skipped\": 0\n    },\n    \"recipients\": [\n      {\n        \"userId\": \"665f0a1b2c3d4e5f67890123\",\n        \"email\": \"studio@example.com\",\n        \"phone\": \"+233241234567\",\n        \"companyName\": \"Bizzles Photography\",\n        \"status\": \"sent\"\n      }\n    ],\n    \"createdAt\": \"2026-07-28T04:11:00.000Z\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Communicate with one photographer",
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"channels\": [\"email\", \"sms\"],\n  \"subject\": \"Quick note from support\",\n  \"message\": \"Thanks for reaching out. Your account is all set.\"\n}"
             },
             "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/communicate"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"channels\": [\"email\", \"sms\"],\n  \"subject\": \"Quick note from support\",\n  \"message\": \"Thanks for reaching out. Your account is all set.\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/communicate"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Photographer communication processed\",\n  \"results\": {\n    \"email\": {\n      \"status\": \"sent\"\n    },\n    \"sms\": {\n      \"status\": \"sent\"\n    }\n  }\n}"
+            }
+          ]
         },
         {
           "name": "List communication history",
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/admin/communications"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/communications"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"items\": [\n    {\n      \"id\": \"665f0a1b2c3d4e5f6789comm2\",\n      \"adminEmail\": \"admin@example.com\",\n      \"channel\": \"email\",\n      \"subject\": \"Important platform update\",\n      \"message\": \"Hi there...\",\n      \"summary\": {\n        \"targeted\": 1,\n        \"sent\": 1,\n        \"failed\": 0,\n        \"skipped\": 0\n      },\n      \"createdAt\": \"2026-07-28T04:11:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 50,\n    \"total\": 1,\n    \"totalPages\": 1,\n    \"hasMore\": false\n  }\n}"
+            }
+          ]
         },
         {
           "name": "List issue reports",
@@ -1107,68 +1552,197 @@
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/admin/issue-reports?status=open"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/issue-reports?status=open"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"items\": [\n    {\n      \"id\": \"665f0a1b2c3d4e5f6789issue\",\n      \"topic\": \"billing\",\n      \"description\": \"Subscription charged twice\",\n      \"status\": \"open\",\n      \"photographerEmail\": \"studio@example.com\",\n      \"createdAt\": \"2026-07-25T12:00:00.000Z\"\n    }\n  ],\n  \"topics\": [\n    \"billing\",\n    \"galleries\",\n    \"sms\",\n    \"other\"\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 50,\n    \"total\": 1,\n    \"totalPages\": 1,\n    \"hasMore\": false\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Resolve issue report",
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"status\": \"resolved\"\n}"
             },
             "url": "{{baseUrl}}/api/admin/issue-reports/{{issueReportId}}"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"resolved\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/issue-reports/{{issueReportId}}"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Issue report updated\",\n  \"report\": {\n    \"id\": \"665f0a1b2c3d4e5f6789issue\",\n    \"status\": \"resolved\",\n    \"resolvedAt\": \"2026-07-28T04:12:00.000Z\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "List studio sender IDs",
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "GET",
             "header": [],
             "description": "List studio SMS sender IDs. `status` = pending|approved|rejected|all. Approval is no longer required for sending — use this to audit or find IDs to reject.",
             "url": "{{baseUrl}}/api/admin/sms/sender-ids?status=all"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/sms/sender-ids?status=all"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"items\": [\n    {\n      \"userId\": \"665f0a1b2c3d4e5f67890123\",\n      \"email\": \"studio@example.com\",\n      \"companyName\": \"Bizzles Photography\",\n      \"smsSenderId\": \"BIZZLES\",\n      \"smsSenderStatus\": \"approved\",\n      \"smsSenderRequestedAt\": \"2026-03-01T10:00:00.000Z\",\n      \"smsSenderApprovedAt\": \"2026-03-01T10:05:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 50,\n    \"total\": 1,\n    \"totalPages\": 1,\n    \"hasMore\": false\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Approve studio sender ID",
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "PATCH",
             "header": [],
             "description": "Optional — studios are auto-approved when they save a sender ID. Use to re-approve after a reject.",
             "url": "{{baseUrl}}/api/admin/sms/sender-ids/{{userId}}/approve"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/sms/sender-ids/{{userId}}/approve"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"SMS sender ID approved\",\n  \"smsSenderId\": \"BIZZLES\",\n  \"smsSenderStatus\": \"approved\"\n}"
+            }
+          ]
         },
         {
           "name": "Reject studio sender ID",
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"reason\": \"Name conflicts with another brand\"\n}"
@@ -1176,7 +1750,1126 @@
             "description": "Blocks the studio sender ID — outbound SMS falls back to ARKESEL_DEFAULT_SENDER until they pick another name.",
             "url": "{{baseUrl}}/api/admin/sms/sender-ids/{{userId}}/reject"
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Name conflicts with another brand\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/sms/sender-ids/{{userId}}/reject"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"SMS sender ID rejected\",\n  \"smsSenderId\": \"BIZZLES\",\n  \"smsSenderStatus\": \"rejected\",\n  \"smsSenderRejectedReason\": \"Name conflicts with another brand\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "List photographer galleries (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    const id = body.items?.[0]?.id || body.gallery?.id;",
+                  "    if (id) {",
+                  "        pm.collectionVariables.set('galleryId', String(id));",
+                  "        if (pm.environment) pm.environment.set('galleryId', String(id));",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "description": "Gallery counts + list for one photographer.",
+            "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/galleries?page=1&limit=50"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/galleries?page=1&limit=50"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"photographer\": {\n    \"userId\": \"665f0a1b2c3d4e5f67890123\",\n    \"email\": \"studio@example.com\",\n    \"companyName\": \"Bizzles Photography\",\n    \"companySlug\": \"bizzles\",\n    \"isActive\": true\n  },\n  \"counts\": {\n    \"all\": 12,\n    \"draft\": 2,\n    \"selecting\": 5,\n    \"done\": 5,\n    \"trash\": 1\n  },\n  \"items\": [\n    {\n      \"id\": \"665f0a1b2c3d4e5f6789abcd\",\n      \"name\": \"Ama & Kojo Wedding\",\n      \"slug\": \"ama-kojo-wedding\",\n      \"status\": \"selecting\",\n      \"eventDate\": \"2026-06-14T12:00:00.000Z\",\n      \"galleryType\": \"wedding\",\n      \"galleryTypeLabel\": \"Wedding\",\n      \"client\": {\n        \"id\": \"665f0a1b2c3d4e5f6789client\",\n        \"name\": \"Ama Mensah\"\n      },\n      \"studio\": {\n        \"userId\": \"665f0a1b2c3d4e5f67890123\",\n        \"email\": \"studio@example.com\",\n        \"companyName\": \"Bizzles Photography\",\n        \"companySlug\": \"bizzles\"\n      },\n      \"share\": {\n        \"url\": \"http://localhost:3000/bizzles/client/ama-kojo-wedding\",\n        \"isShared\": true,\n        \"passwordProtected\": true,\n        \"shareExpiresAt\": \"2026-08-14T12:00:00.000Z\",\n        \"shareLinkExpiryDays\": 30,\n        \"allowDownloads\": true\n      },\n      \"selectionLocked\": false,\n      \"maxSelections\": 40,\n      \"selectionSubmittedAt\": null,\n      \"deletedAt\": null,\n      \"restoreDeadline\": null,\n      \"createdAt\": \"2026-05-01T10:00:00.000Z\",\n      \"updatedAt\": \"2026-07-20T15:30:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 50,\n    \"total\": 1,\n    \"totalPages\": 1,\n    \"hasMore\": false\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List galleries (inspector)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    const id = body.items?.[0]?.id || body.gallery?.id;",
+                  "    if (id) {",
+                  "        pm.collectionVariables.set('galleryId', String(id));",
+                  "        if (pm.environment) pm.environment.set('galleryId', String(id));",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "description": "Search by share slug, studio email, client name, date range, status, shared.",
+            "url": "{{baseUrl}}/api/admin/galleries?slug=&studioEmail=&clientName=&dateFrom=&dateTo=&status=&shared=&search=&page=1&limit=50"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/galleries?slug=&studioEmail=&clientName=&dateFrom=&dateTo=&status=&shared=&search=&page=1&limit=50"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"items\": [\n    {\n      \"id\": \"665f0a1b2c3d4e5f6789abcd\",\n      \"name\": \"Ama & Kojo Wedding\",\n      \"slug\": \"ama-kojo-wedding\",\n      \"status\": \"selecting\",\n      \"eventDate\": \"2026-06-14T12:00:00.000Z\",\n      \"galleryType\": \"wedding\",\n      \"galleryTypeLabel\": \"Wedding\",\n      \"client\": {\n        \"id\": \"665f0a1b2c3d4e5f6789client\",\n        \"name\": \"Ama Mensah\"\n      },\n      \"studio\": {\n        \"userId\": \"665f0a1b2c3d4e5f67890123\",\n        \"email\": \"studio@example.com\",\n        \"companyName\": \"Bizzles Photography\",\n        \"companySlug\": \"bizzles\"\n      },\n      \"share\": {\n        \"url\": \"http://localhost:3000/bizzles/client/ama-kojo-wedding\",\n        \"isShared\": true,\n        \"passwordProtected\": true,\n        \"shareExpiresAt\": \"2026-08-14T12:00:00.000Z\",\n        \"shareLinkExpiryDays\": 30,\n        \"allowDownloads\": true\n      },\n      \"selectionLocked\": false,\n      \"maxSelections\": 40,\n      \"selectionSubmittedAt\": null,\n      \"deletedAt\": null,\n      \"restoreDeadline\": null,\n      \"createdAt\": \"2026-05-01T10:00:00.000Z\",\n      \"updatedAt\": \"2026-07-20T15:30:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 50,\n    \"total\": 1,\n    \"totalPages\": 1,\n    \"hasMore\": false\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get gallery (inspector)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "description": "Gallery status, share password flag, expiry, selection locks, photographer gallery counts.",
+            "url": "{{baseUrl}}/api/admin/galleries/{{galleryId}}"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/galleries/{{galleryId}}"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"gallery\": {\n    \"id\": \"665f0a1b2c3d4e5f6789abcd\",\n    \"name\": \"Ama & Kojo Wedding\",\n    \"slug\": \"ama-kojo-wedding\",\n    \"status\": \"selecting\",\n    \"eventDate\": \"2026-06-14T12:00:00.000Z\",\n    \"galleryType\": \"wedding\",\n    \"galleryTypeLabel\": \"Wedding\",\n    \"client\": {\n      \"id\": \"665f0a1b2c3d4e5f6789client\",\n      \"name\": \"Ama Mensah\"\n    },\n    \"studio\": {\n      \"userId\": \"665f0a1b2c3d4e5f67890123\",\n      \"email\": \"studio@example.com\",\n      \"companyName\": \"Bizzles Photography\",\n      \"companySlug\": \"bizzles\",\n      \"isActive\": true\n    },\n    \"share\": {\n      \"url\": \"http://localhost:3000/bizzles/client/ama-kojo-wedding\",\n      \"tokenPresent\": true,\n      \"isShared\": true,\n      \"passwordProtected\": true,\n      \"shareExpiresAt\": \"2026-08-14T12:00:00.000Z\",\n      \"shareLinkExpiryDays\": 30,\n      \"allowDownloads\": true\n    },\n    \"selectionLocked\": false,\n    \"maxSelections\": 40,\n    \"selectionSubmittedAt\": null,\n    \"deletedAt\": null,\n    \"restoreDeadline\": null,\n    \"createdAt\": \"2026-05-01T10:00:00.000Z\",\n    \"updatedAt\": \"2026-07-20T15:30:00.000Z\",\n    \"photographerGalleryCounts\": {\n      \"all\": 12,\n      \"draft\": 2,\n      \"selecting\": 5,\n      \"done\": 5,\n      \"trash\": 1\n    },\n    \"selection\": {\n      \"locked\": false,\n      \"maxSelections\": 40,\n      \"submittedAt\": null\n    },\n    \"trash\": null,\n    \"eventName\": \"Ama & Kojo Wedding\",\n    \"description\": \"Full-day wedding coverage\",\n    \"companySlug\": \"bizzles\",\n    \"passwordProtected\": true,\n    \"allowDownloads\": true,\n    \"isShared\": true,\n    \"shareToken\": \"abc123sharetoken\",\n    \"shareExpiresAt\": \"2026-08-14T12:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Revoke gallery share",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Admin revoked share link\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/galleries/{{galleryId}}/share/revoke"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Admin revoked share link\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/galleries/{{galleryId}}/share/revoke"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Share link revoked\",\n  \"gallery\": {\n    \"id\": \"665f0a1b2c3d4e5f6789abcd\",\n    \"name\": \"Ama & Kojo Wedding\",\n    \"slug\": \"ama-kojo-wedding\",\n    \"status\": \"selecting\",\n    \"eventDate\": \"2026-06-14T12:00:00.000Z\",\n    \"galleryType\": \"wedding\",\n    \"galleryTypeLabel\": \"Wedding\",\n    \"client\": {\n      \"id\": \"665f0a1b2c3d4e5f6789client\",\n      \"name\": \"Ama Mensah\"\n    },\n    \"studio\": {\n      \"userId\": \"665f0a1b2c3d4e5f67890123\",\n      \"email\": \"studio@example.com\",\n      \"companyName\": \"Bizzles Photography\",\n      \"companySlug\": \"bizzles\",\n      \"isActive\": true\n    },\n    \"share\": {\n      \"url\": \"http://localhost:3000/bizzles/client/ama-kojo-wedding\",\n      \"tokenPresent\": false,\n      \"isShared\": false,\n      \"passwordProtected\": true,\n      \"shareExpiresAt\": null,\n      \"shareLinkExpiryDays\": 30,\n      \"allowDownloads\": true\n    },\n    \"selectionLocked\": false,\n    \"maxSelections\": 40,\n    \"selectionSubmittedAt\": null,\n    \"deletedAt\": null,\n    \"restoreDeadline\": null,\n    \"createdAt\": \"2026-05-01T10:00:00.000Z\",\n    \"updatedAt\": \"2026-07-20T15:30:00.000Z\",\n    \"photographerGalleryCounts\": {\n      \"all\": 12,\n      \"draft\": 2,\n      \"selecting\": 5,\n      \"done\": 5,\n      \"trash\": 1\n    },\n    \"selection\": {\n      \"locked\": false,\n      \"maxSelections\": 40,\n      \"submittedAt\": null\n    },\n    \"trash\": null,\n    \"eventName\": \"Ama & Kojo Wedding\",\n    \"description\": \"Full-day wedding coverage\",\n    \"companySlug\": \"bizzles\",\n    \"passwordProtected\": true,\n    \"allowDownloads\": true,\n    \"isShared\": false,\n    \"shareToken\": null,\n    \"shareExpiresAt\": null\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Extend gallery share",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"extendDays\": 30,\n  \"reason\": \"Extend share for client delivery\"\n}"
+            },
+            "description": "Use extendDays, or days/shareLinkExpiryDays (null = never expire).",
+            "url": "{{baseUrl}}/api/admin/galleries/{{galleryId}}/share/extend"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"extendDays\": 30,\n  \"reason\": \"Extend share for client delivery\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/galleries/{{galleryId}}/share/extend"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Share link extended\",\n  \"gallery\": {\n    \"id\": \"665f0a1b2c3d4e5f6789abcd\",\n    \"name\": \"Ama & Kojo Wedding\",\n    \"slug\": \"ama-kojo-wedding\",\n    \"status\": \"selecting\",\n    \"eventDate\": \"2026-06-14T12:00:00.000Z\",\n    \"galleryType\": \"wedding\",\n    \"galleryTypeLabel\": \"Wedding\",\n    \"client\": {\n      \"id\": \"665f0a1b2c3d4e5f6789client\",\n      \"name\": \"Ama Mensah\"\n    },\n    \"studio\": {\n      \"userId\": \"665f0a1b2c3d4e5f67890123\",\n      \"email\": \"studio@example.com\",\n      \"companyName\": \"Bizzles Photography\",\n      \"companySlug\": \"bizzles\",\n      \"isActive\": true\n    },\n    \"share\": {\n      \"url\": \"http://localhost:3000/bizzles/client/ama-kojo-wedding\",\n      \"tokenPresent\": true,\n      \"isShared\": true,\n      \"passwordProtected\": true,\n      \"shareExpiresAt\": \"2026-09-13T12:00:00.000Z\",\n      \"shareLinkExpiryDays\": 30,\n      \"allowDownloads\": true\n    },\n    \"selectionLocked\": false,\n    \"maxSelections\": 40,\n    \"selectionSubmittedAt\": null,\n    \"deletedAt\": null,\n    \"restoreDeadline\": null,\n    \"createdAt\": \"2026-05-01T10:00:00.000Z\",\n    \"updatedAt\": \"2026-07-20T15:30:00.000Z\",\n    \"photographerGalleryCounts\": {\n      \"all\": 12,\n      \"draft\": 2,\n      \"selecting\": 5,\n      \"done\": 5,\n      \"trash\": 1\n    },\n    \"selection\": {\n      \"locked\": false,\n      \"maxSelections\": 40,\n      \"submittedAt\": null\n    },\n    \"trash\": null,\n    \"eventName\": \"Ama & Kojo Wedding\",\n    \"description\": \"Full-day wedding coverage\",\n    \"companySlug\": \"bizzles\",\n    \"passwordProtected\": true,\n    \"allowDownloads\": true,\n    \"isShared\": true,\n    \"shareToken\": \"abc123sharetoken\",\n    \"shareExpiresAt\": \"2026-09-13T12:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Patch gallery share settings",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"allowDownloads\": false,\n  \"selectionLocked\": true,\n  \"reason\": \"Disable downloads and lock selections\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/galleries/{{galleryId}}/share"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"allowDownloads\": false,\n  \"selectionLocked\": true,\n  \"reason\": \"Disable downloads and lock selections\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/galleries/{{galleryId}}/share"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Gallery share settings updated\",\n  \"gallery\": {\n    \"id\": \"665f0a1b2c3d4e5f6789abcd\",\n    \"name\": \"Ama & Kojo Wedding\",\n    \"slug\": \"ama-kojo-wedding\",\n    \"status\": \"selecting\",\n    \"eventDate\": \"2026-06-14T12:00:00.000Z\",\n    \"galleryType\": \"wedding\",\n    \"galleryTypeLabel\": \"Wedding\",\n    \"client\": {\n      \"id\": \"665f0a1b2c3d4e5f6789client\",\n      \"name\": \"Ama Mensah\"\n    },\n    \"studio\": {\n      \"userId\": \"665f0a1b2c3d4e5f67890123\",\n      \"email\": \"studio@example.com\",\n      \"companyName\": \"Bizzles Photography\",\n      \"companySlug\": \"bizzles\",\n      \"isActive\": true\n    },\n    \"share\": {\n      \"url\": \"http://localhost:3000/bizzles/client/ama-kojo-wedding\",\n      \"tokenPresent\": true,\n      \"isShared\": true,\n      \"passwordProtected\": true,\n      \"shareExpiresAt\": \"2026-08-14T12:00:00.000Z\",\n      \"shareLinkExpiryDays\": 30,\n      \"allowDownloads\": false\n    },\n    \"selectionLocked\": true,\n    \"maxSelections\": 40,\n    \"selectionSubmittedAt\": null,\n    \"deletedAt\": null,\n    \"restoreDeadline\": null,\n    \"createdAt\": \"2026-05-01T10:00:00.000Z\",\n    \"updatedAt\": \"2026-07-20T15:30:00.000Z\",\n    \"photographerGalleryCounts\": {\n      \"all\": 12,\n      \"draft\": 2,\n      \"selecting\": 5,\n      \"done\": 5,\n      \"trash\": 1\n    },\n    \"selection\": {\n      \"locked\": true,\n      \"maxSelections\": 40,\n      \"submittedAt\": null\n    },\n    \"trash\": null,\n    \"eventName\": \"Ama & Kojo Wedding\",\n    \"description\": \"Full-day wedding coverage\",\n    \"companySlug\": \"bizzles\",\n    \"passwordProtected\": true,\n    \"allowDownloads\": false,\n    \"isShared\": true,\n    \"shareToken\": \"abc123sharetoken\",\n    \"shareExpiresAt\": \"2026-08-14T12:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Restore gallery from trash",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Admin restore from trash\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/galleries/{{galleryId}}/restore"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Admin restore from trash\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/galleries/{{galleryId}}/restore"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Gallery restored\",\n  \"gallery\": {\n    \"id\": \"665f0a1b2c3d4e5f6789abcd\",\n    \"name\": \"Ama & Kojo Wedding\",\n    \"slug\": \"ama-kojo-wedding\",\n    \"status\": \"selecting\",\n    \"eventDate\": \"2026-06-14T12:00:00.000Z\",\n    \"galleryType\": \"wedding\",\n    \"galleryTypeLabel\": \"Wedding\",\n    \"client\": {\n      \"id\": \"665f0a1b2c3d4e5f6789client\",\n      \"name\": \"Ama Mensah\"\n    },\n    \"studio\": {\n      \"userId\": \"665f0a1b2c3d4e5f67890123\",\n      \"email\": \"studio@example.com\",\n      \"companyName\": \"Bizzles Photography\",\n      \"companySlug\": \"bizzles\",\n      \"isActive\": true\n    },\n    \"share\": {\n      \"url\": \"http://localhost:3000/bizzles/client/ama-kojo-wedding\",\n      \"tokenPresent\": true,\n      \"isShared\": true,\n      \"passwordProtected\": true,\n      \"shareExpiresAt\": \"2026-08-14T12:00:00.000Z\",\n      \"shareLinkExpiryDays\": 30,\n      \"allowDownloads\": true\n    },\n    \"selectionLocked\": false,\n    \"maxSelections\": 40,\n    \"selectionSubmittedAt\": null,\n    \"deletedAt\": null,\n    \"restoreDeadline\": null,\n    \"createdAt\": \"2026-05-01T10:00:00.000Z\",\n    \"updatedAt\": \"2026-07-20T15:30:00.000Z\",\n    \"photographerGalleryCounts\": {\n      \"all\": 12,\n      \"draft\": 2,\n      \"selecting\": 5,\n      \"done\": 5,\n      \"trash\": 1\n    },\n    \"selection\": {\n      \"locked\": false,\n      \"maxSelections\": 40,\n      \"submittedAt\": null\n    },\n    \"trash\": null,\n    \"eventName\": \"Ama & Kojo Wedding\",\n    \"description\": \"Full-day wedding coverage\",\n    \"companySlug\": \"bizzles\",\n    \"passwordProtected\": true,\n    \"allowDownloads\": true,\n    \"isShared\": true,\n    \"shareToken\": \"abc123sharetoken\",\n    \"shareExpiresAt\": \"2026-08-14T12:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Purge gallery permanently",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Permanent purge after review\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/galleries/{{galleryId}}/purge"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Permanent purge after review\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/galleries/{{galleryId}}/purge"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Gallery permanently deleted\",\n  \"galleryId\": \"665f0a1b2c3d4e5f6789abcd\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "List moderation flagged finals",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "description": "Platform-wide client-flagged finals queue.",
+            "url": "{{baseUrl}}/api/admin/moderation/flagged-finals?page=1&limit=50"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/moderation/flagged-finals?page=1&limit=50"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"items\": [\n    {\n      \"id\": \"665f0a1b2c3d4e5f6789final\",\n      \"galleryId\": \"665f0a1b2c3d4e5f6789abcd\",\n      \"galleryName\": \"Ama & Kojo Wedding\",\n      \"gallerySlug\": \"ama-kojo-wedding\",\n      \"originalFilename\": \"edit-012.jpg\",\n      \"flaggedAt\": \"2026-07-26T16:20:00.000Z\",\n      \"feedback\": {\n        \"comment\": \"Skin tone looks off\",\n        \"thread\": []\n      },\n      \"studio\": {\n        \"userId\": \"665f0a1b2c3d4e5f67890123\",\n        \"email\": \"studio@example.com\",\n        \"companyName\": \"Bizzles Photography\",\n        \"companySlug\": \"bizzles\"\n      },\n      \"createdAt\": \"2026-07-20T10:00:00.000Z\",\n      \"updatedAt\": \"2026-07-26T16:20:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 50,\n    \"total\": 1,\n    \"totalPages\": 1,\n    \"hasMore\": false\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List platform trash",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "description": "Soft-deleted galleries across the platform. Optional ownerId filter.",
+            "url": "{{baseUrl}}/api/admin/trash?page=1&limit=50"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/trash?page=1&limit=50"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"retentionDays\": 30,\n  \"items\": [\n    {\n      \"id\": \"665f0a1b2c3d4e5f6789abcd\",\n      \"name\": \"Ama & Kojo Wedding\",\n      \"slug\": \"ama-kojo-wedding\",\n      \"status\": \"selecting\",\n      \"eventDate\": \"2026-06-14T12:00:00.000Z\",\n      \"galleryType\": \"wedding\",\n      \"galleryTypeLabel\": \"Wedding\",\n      \"client\": {\n        \"id\": \"665f0a1b2c3d4e5f6789client\",\n        \"name\": \"Ama Mensah\"\n      },\n      \"studio\": {\n        \"userId\": \"665f0a1b2c3d4e5f67890123\",\n        \"email\": \"studio@example.com\",\n        \"companyName\": \"Bizzles Photography\",\n        \"companySlug\": \"bizzles\"\n      },\n      \"share\": {\n        \"url\": \"http://localhost:3000/bizzles/client/ama-kojo-wedding\",\n        \"isShared\": false,\n        \"passwordProtected\": true,\n        \"shareExpiresAt\": \"2026-08-14T12:00:00.000Z\",\n        \"shareLinkExpiryDays\": 30,\n        \"allowDownloads\": true\n      },\n      \"selectionLocked\": false,\n      \"maxSelections\": 40,\n      \"selectionSubmittedAt\": null,\n      \"deletedAt\": \"2026-07-10T09:00:00.000Z\",\n      \"restoreDeadline\": \"2026-08-09T09:00:00.000Z\",\n      \"createdAt\": \"2026-05-01T10:00:00.000Z\",\n      \"updatedAt\": \"2026-07-20T15:30:00.000Z\",\n      \"restoreExpired\": false\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 50,\n    \"total\": 1,\n    \"totalPages\": 1,\n    \"hasMore\": false\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Purge expired trash",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Scheduled expired trash purge\"\n}"
+            },
+            "description": "Optional ownerId to scope purge to one studio.",
+            "url": "{{baseUrl}}/api/admin/trash/purge-expired"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Scheduled expired trash purge\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/trash/purge-expired"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Expired trash purged\",\n  \"result\": {\n    \"galleries\": 3,\n    \"photos\": 12,\n    \"finals\": 4\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Empty studio trash",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Empty all trash for this studio\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/trash/empty"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Empty all trash for this studio\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/trash/empty"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Studio trash emptied\",\n  \"result\": {\n    \"galleries\": 1,\n    \"photos\": 5,\n    \"finals\": 2\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "CRM studio client totals",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "description": "Aggregate client counts per studio — no client PII.",
+            "url": "{{baseUrl}}/api/admin/crm/studios?search=&page=1&limit=50"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/crm/studios?search=&page=1&limit=50"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"items\": [\n    {\n      \"userId\": \"665f0a1b2c3d4e5f67890123\",\n      \"email\": \"studio@example.com\",\n      \"companyName\": \"Bizzles Photography\",\n      \"companySlug\": \"bizzles\",\n      \"isActive\": true,\n      \"clientCount\": 48,\n      \"latestClientAt\": \"2026-07-22T11:00:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 50,\n    \"total\": 1,\n    \"totalPages\": 1,\n    \"hasMore\": false\n  },\n  \"note\": \"Aggregate client counts only — no client PII in this response\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "CRM studio summary",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "description": "Studio CRM summary without PII. For client contact fields: ?includePii=true&reason=...",
+            "url": "{{baseUrl}}/api/admin/crm/studios/{{userId}}"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/crm/studios/{{userId}}"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"studio\": {\n    \"userId\": \"665f0a1b2c3d4e5f67890123\",\n    \"email\": \"studio@example.com\",\n    \"companyName\": \"Bizzles Photography\",\n    \"companySlug\": \"bizzles\",\n    \"isActive\": true\n  },\n  \"totals\": {\n    \"clients\": 48,\n    \"upcomingBookings\": 6,\n    \"bookingsThisMonth\": 3\n  },\n  \"includePii\": false,\n  \"recentClients\": [\n    {\n      \"id\": \"665f0a1b2c3d4e5f6789client\",\n      \"name\": \"Ama Mensah\",\n      \"createdAt\": \"2026-07-22T11:00:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "CRM studio summary (with PII)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "description": "Requires reason; logs admin role + reason.",
+            "url": "{{baseUrl}}/api/admin/crm/studios/{{userId}}?includePii=true&reason=Support investigation ticket 123"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/crm/studios/{{userId}}?includePii=true&reason=Support investigation ticket 123"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"studio\": {\n    \"userId\": \"665f0a1b2c3d4e5f67890123\",\n    \"email\": \"studio@example.com\",\n    \"companyName\": \"Bizzles Photography\",\n    \"companySlug\": \"bizzles\",\n    \"isActive\": true\n  },\n  \"totals\": {\n    \"clients\": 48,\n    \"upcomingBookings\": 6,\n    \"bookingsThisMonth\": 3\n  },\n  \"includePii\": true,\n  \"recentClients\": [\n    {\n      \"id\": \"665f0a1b2c3d4e5f6789client\",\n      \"name\": \"Ama Mensah\",\n      \"email\": \"ama@example.com\",\n      \"phone\": \"+233209998877\",\n      \"location\": \"Accra\",\n      \"createdAt\": \"2026-07-22T11:00:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "CRM bookings calendar",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "description": "Filter by studio (ownerId), date range, shootType/category. Default omits client PII.",
+            "url": "{{baseUrl}}/api/admin/crm/bookings?ownerId={{userId}}&dateFrom=2026-01-01&dateTo=2026-12-31&shootType=&page=1&limit=100"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/crm/bookings?ownerId={{userId}}&dateFrom=2026-01-01&dateTo=2026-12-31&shootType=&page=1&limit=100"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"includePii\": false,\n  \"items\": [\n    {\n      \"id\": \"665f0a1b2c3d4e5f6789book\",\n      \"title\": \"Ama & Kojo Wedding\",\n      \"category\": \"wedding\",\n      \"categoryLabel\": \"Wedding\",\n      \"startsAt\": \"2026-08-14T09:00:00.000Z\",\n      \"endsAt\": \"2026-08-14T18:00:00.000Z\",\n      \"amountCharged\": 8500,\n      \"currency\": \"GHS\",\n      \"invoicedAt\": null,\n      \"studio\": {\n        \"userId\": \"665f0a1b2c3d4e5f67890123\",\n        \"email\": \"studio@example.com\",\n        \"companyName\": \"Bizzles Photography\",\n        \"companySlug\": \"bizzles\"\n      },\n      \"client\": {\n        \"id\": \"665f0a1b2c3d4e5f6789client\",\n        \"name\": \"Ama Mensah\"\n      },\n      \"createdAt\": \"2026-05-01T10:00:00.000Z\",\n      \"updatedAt\": \"2026-05-01T10:00:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 100,\n    \"total\": 1,\n    \"totalPages\": 1,\n    \"hasMore\": false\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "CRM bookings calendar (with PII)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "description": "PII export — reason required and audited.",
+            "url": "{{baseUrl}}/api/admin/crm/bookings?ownerId={{userId}}&dateFrom=2026-01-01&dateTo=2026-12-31&includePii=true&reason=Support investigation ticket 123&page=1&limit=100"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/crm/bookings?ownerId={{userId}}&dateFrom=2026-01-01&dateTo=2026-12-31&includePii=true&reason=Support investigation ticket 123&page=1&limit=100"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"includePii\": true,\n  \"items\": [\n    {\n      \"id\": \"665f0a1b2c3d4e5f6789book\",\n      \"title\": \"Ama & Kojo Wedding\",\n      \"category\": \"wedding\",\n      \"categoryLabel\": \"Wedding\",\n      \"startsAt\": \"2026-08-14T09:00:00.000Z\",\n      \"endsAt\": \"2026-08-14T18:00:00.000Z\",\n      \"location\": \"Labadi Beach Hotel\",\n      \"amountCharged\": 8500,\n      \"currency\": \"GHS\",\n      \"invoicedAt\": null,\n      \"studio\": {\n        \"userId\": \"665f0a1b2c3d4e5f67890123\",\n        \"email\": \"studio@example.com\",\n        \"companyName\": \"Bizzles Photography\",\n        \"companySlug\": \"bizzles\"\n      },\n      \"client\": {\n        \"id\": \"665f0a1b2c3d4e5f6789client\",\n        \"name\": \"Ama Mensah\",\n        \"email\": \"ama@example.com\",\n        \"phone\": \"+233209998877\",\n        \"location\": \"Accra\"\n      },\n      \"createdAt\": \"2026-05-01T10:00:00.000Z\",\n      \"updatedAt\": \"2026-05-01T10:00:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 100,\n    \"total\": 1,\n    \"totalPages\": 1,\n    \"hasMore\": false\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List billing plans",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "description": "Plan catalog: Free, Basic, Business. Includes featureCatalog and comparison.",
+            "url": "{{baseUrl}}/api/admin/billing/plans"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/billing/plans"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"plans\": [\n    {\n      \"id\": \"free\",\n      \"name\": \"Free\",\n      \"description\": \"5 GB storage for getting started\",\n      \"storageLimitBytes\": 5368709120,\n      \"storageBytes\": 5368709120,\n      \"storageLabel\": \"5 GB\",\n      \"maxGalleries\": null,\n      \"perks\": [\n        \"5 GB storage\",\n        \"Client galleries\",\n        \"Basic share links\"\n      ],\n      \"priceGhs\": 0,\n      \"interval\": null,\n      \"paystackPlanCode\": null,\n      \"available\": true\n    },\n    {\n      \"id\": \"pro\",\n      \"name\": \"Pro\",\n      \"description\": \"100 GB storage for busy photographers\",\n      \"storageLimitBytes\": 107374182400,\n      \"storageBytes\": 107374182400,\n      \"storageLabel\": \"100 GB\",\n      \"maxGalleries\": null,\n      \"perks\": [\n        \"100 GB storage\",\n        \"Unlimited galleries\",\n        \"Priority support\",\n        \"Custom branding\"\n      ],\n      \"priceGhs\": 199,\n      \"interval\": \"monthly\",\n      \"paystackPlanCode\": \"PLN_pro_sample\",\n      \"available\": true\n    },\n    {\n      \"id\": \"starter\",\n      \"name\": \"Starter\",\n      \"description\": \"25 GB storage for growing studios\",\n      \"storageLimitBytes\": 26843545600,\n      \"storageBytes\": 26843545600,\n      \"storageLabel\": \"25 GB\",\n      \"maxGalleries\": null,\n      \"perks\": [\n        \"25 GB storage\",\n        \"Unlimited galleries\",\n        \"Client selections\"\n      ],\n      \"priceGhs\": 79,\n      \"interval\": \"monthly\",\n      \"paystackPlanCode\": \"PLN_starter_sample\",\n      \"available\": true\n    },\n    {\n      \"id\": \"studio\",\n      \"name\": \"Studio\",\n      \"description\": \"500 GB storage for high-volume studios\",\n      \"storageLimitBytes\": 536870912000,\n      \"storageBytes\": 536870912000,\n      \"storageLabel\": \"500 GB\",\n      \"maxGalleries\": null,\n      \"perks\": [\n        \"500 GB storage\",\n        \"Unlimited galleries\",\n        \"Priority support\",\n        \"Custom branding\",\n        \"Team-ready limits\"\n      ],\n      \"priceGhs\": 499,\n      \"interval\": \"monthly\",\n      \"paystackPlanCode\": \"PLN_studio_sample\",\n      \"available\": true\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update billing plan",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"storageLimitBytes\": 107374182400,\n  \"maxGalleries\": null,\n  \"priceGhs\": 199,\n  \"perks\": [\"100 GB storage\", \"Unlimited galleries\", \"Priority support\"],\n  \"description\": \"100 GB storage for busy photographers\",\n  \"reason\": \"Adjust Pro plan limits\"\n}"
+            },
+            "description": "Edit storageLimitBytes (alias storageBytes), maxGalleries, maxTeamMembers, perks, featureKeys, supportTier, priceGhs, name, description. planId: free|basic|pro|premium (aliases starter|business|studio).",
+            "url": "{{baseUrl}}/api/admin/billing/plans/{{planId}}"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"storageLimitBytes\": 107374182400,\n  \"maxGalleries\": null,\n  \"priceGhs\": 199,\n  \"perks\": [\"100 GB storage\", \"Unlimited galleries\", \"Priority support\"],\n  \"description\": \"100 GB storage for busy photographers\",\n  \"reason\": \"Adjust Pro plan limits\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/billing/plans/{{planId}}"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Plan updated\",\n  \"plan\": {\n    \"id\": \"pro\",\n    \"name\": \"Pro\",\n    \"description\": \"100 GB storage for busy photographers\",\n    \"storageLimitBytes\": 107374182400,\n    \"storageBytes\": 107374182400,\n    \"storageLabel\": \"100 GB\",\n    \"maxGalleries\": null,\n    \"perks\": [\n      \"100 GB storage\",\n      \"Unlimited galleries\",\n      \"Priority support\",\n      \"Custom branding\"\n    ],\n    \"priceGhs\": 199,\n    \"interval\": \"monthly\",\n    \"paystackPlanCode\": \"PLN_pro_sample\",\n    \"available\": true\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Set photographer limit override",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"storageLimitBytes\": 214748364800,\n  \"maxGalleries\": 50,\n  \"expiresInDays\": 30,\n  \"reason\": \"Temporary bump for launch week\"\n}"
+            },
+            "description": "Temporary storage/gallery bumps. Use clear:true to remove.",
+            "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/limit-override"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"storageLimitBytes\": 214748364800,\n  \"maxGalleries\": 50,\n  \"expiresInDays\": 30,\n  \"reason\": \"Temporary bump for launch week\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/limit-override"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Limit override applied\",\n  \"subscription\": {\n    \"planId\": \"pro\",\n    \"planName\": \"Pro\",\n    \"storageLimitBytes\": 214748364800,\n    \"storageLabel\": \"200 GB\",\n    \"maxGalleries\": 50,\n    \"perks\": [\n      \"100 GB storage\",\n      \"Unlimited galleries\",\n      \"Priority support\",\n      \"Custom branding\"\n    ],\n    \"priceGhs\": 199,\n    \"interval\": \"monthly\",\n    \"status\": \"active\",\n    \"currentPeriodEnd\": \"2026-08-28T00:00:00.000Z\",\n    \"cancelAtPeriodEnd\": false,\n    \"pendingPlanId\": null,\n    \"paystackSubscriptionCode\": \"SUB_sample\",\n    \"canManage\": true,\n    \"limitOverride\": {\n      \"storageLimitBytes\": 214748364800,\n      \"maxGalleries\": 50,\n      \"expiresAt\": \"2026-08-27T04:00:00.000Z\",\n      \"reason\": \"Temporary bump for launch week\",\n      \"setAt\": \"2026-07-28T04:00:00.000Z\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Clear photographer limit override",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clear\": true,\n  \"reason\": \"Temporary bump expired\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/limit-override"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"clear\": true,\n  \"reason\": \"Temporary bump expired\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/photographers/{{userId}}/limit-override"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Limit override cleared\",\n  \"subscription\": {\n    \"planId\": \"pro\",\n    \"planName\": \"Pro\",\n    \"storageLimitBytes\": 107374182400,\n    \"storageLabel\": \"100 GB\",\n    \"maxGalleries\": null,\n    \"perks\": [\n      \"100 GB storage\",\n      \"Unlimited galleries\",\n      \"Priority support\",\n      \"Custom branding\"\n    ],\n    \"priceGhs\": 199,\n    \"interval\": \"monthly\",\n    \"status\": \"active\",\n    \"currentPeriodEnd\": \"2026-08-28T00:00:00.000Z\",\n    \"cancelAtPeriodEnd\": false,\n    \"pendingPlanId\": null,\n    \"paystackSubscriptionCode\": \"SUB_sample\",\n    \"canManage\": true,\n    \"limitOverride\": null\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List billing events",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "description": "category=paid|failed|dispute|other. Optional userId, eventType, reference.",
+            "url": "{{baseUrl}}/api/admin/billing/events?category=&userId=&page=1&limit=50"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/admin/billing/events?category=&userId=&page=1&limit=50"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"items\": [\n    {\n      \"id\": \"665f0a1b2c3d4e5f6789bill\",\n      \"eventId\": \"409758321\",\n      \"eventType\": \"charge.success\",\n      \"category\": \"paid\",\n      \"reference\": \"GT_SUB_abc123\",\n      \"amount\": 199,\n      \"currency\": \"GHS\",\n      \"status\": \"success\",\n      \"processedAt\": \"2026-07-01T08:00:00.000Z\",\n      \"createdAt\": \"2026-07-01T08:00:00.000Z\",\n      \"user\": {\n        \"userId\": \"665f0a1b2c3d4e5f67890123\",\n        \"email\": \"studio@example.com\",\n        \"companyName\": \"Bizzles Photography\",\n        \"companySlug\": \"bizzles\",\n        \"planId\": \"pro\"\n      }\n    },\n    {\n      \"id\": \"665f0a1b2c3d4e5f6789bil2\",\n      \"eventId\": \"409758399\",\n      \"eventType\": \"invoice.payment_failed\",\n      \"category\": \"failed\",\n      \"reference\": \"GT_SUB_abc123\",\n      \"amount\": 199,\n      \"currency\": \"GHS\",\n      \"status\": \"failed\",\n      \"processedAt\": \"2026-07-15T08:00:00.000Z\",\n      \"createdAt\": \"2026-07-15T08:00:00.000Z\",\n      \"user\": {\n        \"userId\": \"665f0a1b2c3d4e5f67890123\",\n        \"email\": \"studio@example.com\",\n        \"companyName\": \"Bizzles Photography\",\n        \"companySlug\": \"bizzles\",\n        \"planId\": \"pro\"\n      }\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 50,\n    \"total\": 1,\n    \"totalPages\": 1,\n    \"hasMore\": false\n  }\n}"
+            }
+          ]
         }
       ]
     },
@@ -1664,6 +3357,48 @@
           ]
         },
         {
+          "name": "API tokens",
+          "description": "Business-plan personal access tokens. Create returns the raw token once. Send as Authorization: Bearer gt_live_…",
+          "item": [
+            {
+              "name": "List API tokens",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/settings/api-tokens"
+              },
+              "response": []
+            },
+            {
+              "name": "Create API token",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Zapier\"\n}"
+                },
+                "url": "{{baseUrl}}/api/settings/api-tokens"
+              },
+              "response": []
+            },
+            {
+              "name": "Revoke API token",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": "{{baseUrl}}/api/settings/api-tokens/{{apiTokenId}}"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
           "name": "Help & support",
           "description": "Report an issue — submit topic, description, and optional screenshots/files directly to the API.",
           "item": [
@@ -1800,8 +3535,13 @@
             "description": "Returns dashboard widgets in one payload:\n- `stats` — clients, galleries, inProgress (draft + selecting), completed (done)\n- `storage` — used/limit bytes, plan %, breakdown (raws/selections/finals), RAW focus\n- `weeklyActivity` — today, thisWeek, trend, on_track status, 7-day chart series\n- `recentActivity` — gallery feed with action labels (Updated, Proofing, Delivered)\n- `recentGalleries` — gallery cards with cover thumbnails\n- `user` — photographer profile summary",
             "url": {
               "raw": "{{baseUrl}}/api/dashboard?recentLimit=10&activityDays=7",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "dashboard"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dashboard"
+              ],
               "query": [
                 {
                   "key": "recentLimit",
@@ -1844,11 +3584,24 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/storage?sort=size&order=desc",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "storage"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "storage"
+              ],
               "query": [
-                { "key": "sort", "value": "size", "description": "size or name" },
-                { "key": "order", "value": "desc", "description": "asc or desc" }
+                {
+                  "key": "sort",
+                  "value": "size",
+                  "description": "size or name"
+                },
+                {
+                  "key": "order",
+                  "value": "desc",
+                  "description": "asc or desc"
+                }
               ]
             }
           },
@@ -1858,7 +3611,7 @@
     },
     {
       "name": "Billing",
-      "description": "Paystack subscription plans. Set PAYSTACK_SECRET_KEY and plan codes in .env. Checkout returns authorizationUrl — open in browser to pay. Webhook: POST /api/billing/webhook.",
+      "description": "Paystack subscription plans (Free 30-day trial / Basic GHS 40 / Pro GHS 70 / Premium GHS 120). GET /plans returns featureCatalog + comparison. Checkout planId: basic|pro|premium (aliases: starter|business|studio). Webhook: POST /api/billing/webhook.",
       "item": [
         {
           "name": "Get billing config",
@@ -1920,13 +3673,18 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"planId\": \"starter\"\n}"
+              "raw": "{\n  \"planId\": \"basic\"\n}"
             },
             "url": "{{baseUrl}}/api/billing/checkout",
-            "description": "planId: starter | pro | studio. Returns checkout.authorizationUrl — redirect user there to pay with Paystack."
+            "description": "planId: basic (GHS 40) | pro (GHS 70) | premium (GHS 120). Aliases: starter→basic, business→pro, studio→premium. Returns checkout.authorizationUrl — redirect user there to pay with Paystack."
           },
           "response": []
         },
@@ -1937,9 +3695,20 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/billing/verify?reference=PAYSTACK_REFERENCE",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "billing", "verify"],
-              "query": [{ "key": "reference", "value": "PAYSTACK_REFERENCE" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "billing",
+                "verify"
+              ],
+              "query": [
+                {
+                  "key": "reference",
+                  "value": "PAYSTACK_REFERENCE"
+                }
+              ]
             },
             "description": "Optional fallback if webhook is delayed (local dev). Replace reference with Paystack transaction reference."
           },
@@ -1976,9 +3745,19 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/clients?search=acme",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "clients"],
-              "query": [{ "key": "search", "value": "acme" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "acme"
+                }
+              ]
             }
           },
           "response": []
@@ -2012,7 +3791,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Acme Studios\",\n  \"email\": \"contact@acme.com\",\n  \"phone\": \"+233200000000\",\n  \"location\": \"Accra, Ghana\"\n}"
@@ -2025,7 +3809,12 @@
           "name": "Update client",
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Acme Studios (updated)\",\n  \"email\": \"hello@acme.com\",\n  \"phone\": \"+233200000001\",\n  \"location\": \"Kumasi, Ghana\"\n}"
@@ -2047,7 +3836,7 @@
     },
     {
       "name": "Galleries",
-      "description": "Requires JWT and `clientId`. Share URL: `{{companySlug}}/{{gallerySlug}}` (activate share link first).\n\n**Customize gallery:** cover focal, design (cover style / grid / fonts), client access (password, downloads), selection limit, background music.\n\n**Uploads tab:** `POST .../uploads` — field `photos` (images + video).\n**Finals tab:** `POST .../finals` — field `finals` (images + video).\n\n**Per-file limits:** images max **100MB**, videos max **1TB**. **Batch:** up to **700 files** per request.",
+      "description": "Requires JWT and `clientId`. Share URL: `{{companySlug}}/{{gallerySlug}}` (activate share link first).\n\n**Customize gallery:** cover focal, design (cover style / grid / fonts), client access (password, downloads), selection limit, background music.\n\n**Uploads tab:** choose photo vs video — `POST .../uploads/photos` (field `photos`) or `POST .../uploads/videos` (field `videos`).\n**Finals tab:** `POST .../finals` — field `finals` (images + video).\n\n**Per-file limits:** images max **100MB**, videos max **1TB**. **Batch:** up to **700 files** per request.",
       "item": [
         {
           "name": "List galleries",
@@ -2056,9 +3845,20 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/galleries?status=all",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "galleries"],
-              "query": [{ "key": "status", "value": "all", "description": "all | draft | selecting | done" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "galleries"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "all",
+                  "description": "all | draft | selecting | done"
+                }
+              ]
             }
           },
           "response": []
@@ -2070,9 +3870,19 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/galleries?search=wedding",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "galleries"],
-              "query": [{ "key": "search", "value": "wedding" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "galleries"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "wedding"
+                }
+              ]
             }
           },
           "response": []
@@ -2090,7 +3900,12 @@
           "name": "Generate description (preview)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventName\": \"Sarah & James — wedding day\",\n  \"galleryType\": \"wedding\"\n}"
@@ -2120,7 +3935,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"clientId\": \"{{clientId}}\",\n  \"name\": \"Kwaku Wedding\",\n  \"eventDate\": \"2026-05-18\",\n  \"description\": \"\",\n  \"shareLinkExpiryDays\": 30,\n  \"useDefaultCover\": true,\n  \"generateDescriptionAi\": false\n}"
@@ -2149,7 +3969,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"clientId\": \"{{clientId}}\",\n  \"name\": \"Studio Portraits, April\",\n  \"galleryType\": \"portraits\",\n  \"eventDate\": \"2026-04-01\",\n  \"shareLinkExpiryDays\": 30,\n  \"useDefaultCover\": true,\n  \"generateDescriptionAi\": true\n}"
@@ -2182,10 +4007,26 @@
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "clientId", "value": "{{clientId}}", "type": "text" },
-                { "key": "name", "value": "Kwaku Wedding", "type": "text" },
-                { "key": "eventDate", "value": "2026-05-18", "type": "text" },
-                { "key": "useDefaultCover", "value": "false", "type": "text" },
+                {
+                  "key": "clientId",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "name",
+                  "value": "Kwaku Wedding",
+                  "type": "text"
+                },
+                {
+                  "key": "eventDate",
+                  "value": "2026-05-18",
+                  "type": "text"
+                },
+                {
+                  "key": "useDefaultCover",
+                  "value": "false",
+                  "type": "text"
+                },
                 {
                   "key": "cover",
                   "type": "file",
@@ -2272,7 +4113,12 @@
           ],
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Kwaku Wedding (updated)\",\n  \"eventDate\": \"2026-06-05\",\n  \"description\": \"Outdoor ceremony and reception coverage.\",\n  \"galleryType\": \"wedding\",\n  \"slug\": \"kwaku-wedding-2026\"\n}"
@@ -2286,7 +4132,12 @@
           "name": "Update gallery",
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Kwaku Wedding (updated)\",\n  \"status\": \"selecting\",\n  \"shareLinkExpiryDays\": 60,\n  \"generateDescriptionAi\": false\n}"
@@ -2303,7 +4154,11 @@
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "useDefaultCover", "value": "false", "type": "text" },
+                {
+                  "key": "useDefaultCover",
+                  "value": "false",
+                  "type": "text"
+                },
                 {
                   "key": "cover",
                   "type": "file",
@@ -2320,7 +4175,12 @@
           "name": "Revert to studio default cover",
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"useDefaultCover\": true\n}"
@@ -2344,105 +4204,130 @@
           "name": "Customize gallery",
           "description": "Client link presentation and access — matches the **Customize gallery** sidebar in the app.\n\n**Design options:** `GET /api/galleries/meta` → `design.coverStyles`, `design.gridStyles`, `design.generalColors`, `design.typography`.\n\n**Cover styles:** cinematic, collage, minimal, bento, overlay, card_based, parallax, hero_carousel, full_bleed, editorial_card, film_border, split_feature.\n\n**Grid styles:** uniform, masonry, bento, split, horizontal_scroll, collage, adaptive.\n\n**General colors:** preset keys (charcoal, ink, forest, wine, navy, clay, stone, cream) or hex `#rrggbb`.\n\n**Typography:** title fonts — Playfair Display, Cormorant Garamond, Libre Baskerville, DM Serif Display; body fonts — Inter, DM Sans, Source Sans 3, Nunito Sans.",
           "item": [
-        {
-          "name": "Update cover focal point",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"coverFocalX\": 50,\n  \"coverFocalY\": 35\n}"
+            {
+              "name": "Update cover focal point",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"coverFocalX\": 50,\n  \"coverFocalY\": 35\n}"
+                },
+                "description": "Drag focal point for cover crop (0–100%).",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/cover-focal-point"
+              },
+              "response": []
             },
-            "description": "Drag focal point for cover crop (0–100%).",
-            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/cover-focal-point"
-          },
-          "response": []
-        },
-        {
-          "name": "Upload background music",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "formdata",
-              "formdata": [
-                {
-                  "key": "audio",
-                  "type": "file",
-                  "src": [],
-                  "description": "MP3, M4A, WAV, AAC, or OGG — max 20MB"
-                }
-              ]
+            {
+              "name": "Upload background music",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "audio",
+                      "type": "file",
+                      "src": [],
+                      "description": "MP3, M4A, WAV, AAC, or OGG — max 20MB"
+                    }
+                  ]
+                },
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/music"
+              },
+              "response": []
             },
-            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/music"
-          },
-          "response": []
-        },
-        {
-          "name": "Toggle background music",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"backgroundMusicEnabled\": true\n}"
+            {
+              "name": "Toggle background music",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"backgroundMusicEnabled\": true\n}"
+                },
+                "description": "Upload audio first. Clients hear it on the share gallery when enabled.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/music"
+              },
+              "response": []
             },
-            "description": "Upload audio first. Clients hear it on the share gallery when enabled.",
-            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/music"
-          },
-          "response": []
-        },
-        {
-          "name": "Remove background music",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/music"
-          },
-          "response": []
-        },
-        {
-          "name": "Update selection settings",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"maxSelections\": 20,\n  \"selectionLocked\": false,\n  \"finalDeliveryEnabled\": true\n}"
+            {
+              "name": "Remove background music",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/music"
+              },
+              "response": []
             },
-            "description": "Set heart-pick limit (`null` = unlimited), lock client edits, and toggle finals tab.",
-            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/selection-settings"
-          },
-          "response": []
-        },
-        {
-          "name": "Update gallery design",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"coverStyle\": \"full_bleed\",\n  \"generalColor\": \"cream\",\n  \"gridStyle\": \"masonry\",\n  \"titleFont\": \"Playfair Display\",\n  \"bodyFont\": \"Inter\"\n}"
+            {
+              "name": "Update selection settings",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"maxSelections\": 20,\n  \"selectionLocked\": false,\n  \"finalDeliveryEnabled\": true\n}"
+                },
+                "description": "Set heart-pick limit (`null` = unlimited), lock client edits, and toggle finals tab.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/selection-settings"
+              },
+              "response": []
             },
-            "description": "Cover style, general color, grid layout, and typography for the client link. `generalColor` and legacy `backdropColor` are both accepted. Saved fields appear on `GET /api/public/...` as `gallery.design`.",
-            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/design-settings"
-          },
-          "response": []
-        },
-        {
-          "name": "Update client access",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"passwordProtected\": true,\n  \"password\": \"{{galleryPassword}}\",\n  \"allowDownloads\": true\n}"
+            {
+              "name": "Update gallery design",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"coverStyle\": \"full_bleed\",\n  \"generalColor\": \"cream\",\n  \"gridStyle\": \"masonry\",\n  \"titleFont\": \"Playfair Display\",\n  \"bodyFont\": \"Inter\"\n}"
+                },
+                "description": "Cover style, general color, grid layout, and typography for the client link. `generalColor` and legacy `backdropColor` are both accepted. Saved fields appear on `GET /api/public/...` as `gallery.design`.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/design-settings"
+              },
+              "response": []
             },
-            "description": "Password protection and download toggle for the public gallery. Use the same password in **Public Galleries → Unlock gallery**.",
-            "url": "{{baseUrl}}/api/galleries/{{galleryId}}/client-access"
-          },
-          "response": []
-        }
+            {
+              "name": "Update client access",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"passwordProtected\": true,\n  \"password\": \"{{galleryPassword}}\",\n  \"allowDownloads\": true\n}"
+                },
+                "description": "Password protection and download toggle for the public gallery. Use the same password in **Public Galleries → Unlock gallery**.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/client-access"
+              },
+              "response": []
+            }
           ]
         },
         {
@@ -2484,7 +4369,7 @@
         },
         {
           "name": "Uploads",
-          "description": "Raw files tab — images and video (JPG, PNG, WebP, GIF, MP4, MOV, WebM, etc.). Multipart field: `photos`.\n\n**Limits:** each image max **100MB**, each video max **1TB**. Up to **700 files** in one batch.",
+          "description": "Raw files tab — **choose photos or videos in the UI**.\n\n**Preferred:**\n- Photos: `POST …/uploads/photos` (field `photos`) or S3 `…/photos/presign` → PUT → `…/photos/complete`\n- Videos: `POST …/uploads/videos` (field `videos`) or S3 `…/videos/presign` → PUT → `…/videos/complete`\n\n**List filter:** `GET …/uploads?mediaType=photo|video`\n\n**Legacy mixed:** `POST …/uploads` still accepts images+video on field `photos`.\n\n**Limits:** images max **100MB**, videos max **1TB**. Up to **700 files** per batch.",
           "item": [
             {
               "name": "List uploads",
@@ -2492,6 +4377,26 @@
                 "method": "GET",
                 "header": [],
                 "url": "{{baseUrl}}/api/galleries/{{galleryId}}/uploads"
+              },
+              "response": []
+            },
+            {
+              "name": "List photo uploads",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "description": "Same as list uploads, filtered to images only.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/uploads?mediaType=photo"
+              },
+              "response": []
+            },
+            {
+              "name": "List video uploads",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "description": "Same as list uploads, filtered to videos only.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/uploads?mediaType=video"
               },
               "response": []
             },
@@ -2516,7 +4421,12 @@
               ],
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"watermarkPreviewEnabled\": true\n}"
@@ -2527,7 +4437,7 @@
               "response": []
             },
             {
-              "name": "Upload files",
+              "name": "Upload photos",
               "event": [
                 {
                   "listen": "test",
@@ -2553,7 +4463,7 @@
                       "key": "photos",
                       "type": "file",
                       "src": [],
-                      "description": "One or more files — each image max 100MB, each video max 1TB (up to 700 files per request)"
+                      "description": "Images only (JPG/PNG/WebP/GIF) — max 100MB each, up to 700 files"
                     },
                     {
                       "key": "onConflict",
@@ -2563,7 +4473,167 @@
                     }
                   ]
                 },
-                "description": "Multipart upload. **Per file:** images max 100MB, videos max 1TB. **Batch:** up to 700 files. Optional `onConflict`: skip | replace | cancel.",
+                "description": "UI: **Upload photos**. Images only. Local multipart when S3 is off; with S3 use Presign photos → PUT → Complete photos.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/uploads/photos"
+              },
+              "response": []
+            },
+            {
+              "name": "Upload videos",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Created (201)', () => pm.response.to.have.status(201));",
+                      "if (pm.response.code === 201) {",
+                      "    const created = pm.response.json().created || [];",
+                      "    if (created[0]?.id) savePhotoId(created[0].id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "videos",
+                      "type": "file",
+                      "src": [],
+                      "description": "Videos only (MP4/MOV/WebM/…) — max 1TB each, up to 700 files"
+                    },
+                    {
+                      "key": "onConflict",
+                      "value": "skip",
+                      "type": "text",
+                      "description": "skip | replace | cancel (duplicate filenames)"
+                    }
+                  ]
+                },
+                "description": "UI: **Upload videos**. Videos only. Local multipart when S3 is off; with S3 use Presign videos → PUT → Complete videos.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/uploads/videos"
+              },
+              "response": []
+            },
+            {
+              "name": "Presign photo uploads",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"files\": [\n    {\n      \"originalFilename\": \"IMG_001.jpg\",\n      \"mimeType\": \"image/jpeg\",\n      \"sizeBytes\": 2500000\n    }\n  ],\n  \"onConflict\": \"skip\"\n}"
+                },
+                "description": "S3 direct upload — photos only. Then PUT each `presignedUrl`, then **Complete photo uploads**.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/uploads/photos/presign"
+              },
+              "response": []
+            },
+            {
+              "name": "Complete photo uploads",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"files\": [\n    {\n      \"originalFilename\": \"IMG_001.jpg\",\n      \"mimeType\": \"image/jpeg\",\n      \"sizeBytes\": 2500000,\n      \"storedFilename\": \"paste-from-presign.json\"\n    }\n  ],\n  \"onConflict\": \"skip\"\n}"
+                },
+                "description": "Register photo files after S3 PUT. `storedFilename` comes from presign response.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/uploads/photos/complete"
+              },
+              "response": []
+            },
+            {
+              "name": "Presign video uploads",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"files\": [\n    {\n      \"originalFilename\": \"clip.mp4\",\n      \"mimeType\": \"video/mp4\",\n      \"sizeBytes\": 50000000\n    }\n  ],\n  \"onConflict\": \"skip\"\n}"
+                },
+                "description": "S3 direct upload — videos only. Then PUT each `presignedUrl`, then **Complete video uploads**.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/uploads/videos/presign"
+              },
+              "response": []
+            },
+            {
+              "name": "Complete video uploads",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"files\": [\n    {\n      \"originalFilename\": \"clip.mp4\",\n      \"mimeType\": \"video/mp4\",\n      \"sizeBytes\": 50000000,\n      \"storedFilename\": \"paste-from-presign.json\"\n    }\n  ],\n  \"onConflict\": \"skip\"\n}"
+                },
+                "description": "Register video files after S3 PUT. `storedFilename` comes from presign response.",
+                "url": "{{baseUrl}}/api/galleries/{{galleryId}}/uploads/videos/complete"
+              },
+              "response": []
+            },
+            {
+              "name": "Upload files (legacy mixed)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Created (201)', () => pm.response.to.have.status(201));",
+                      "if (pm.response.code === 201) {",
+                      "    const created = pm.response.json().created || [];",
+                      "    if (created[0]?.id) savePhotoId(created[0].id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "photos",
+                      "type": "file",
+                      "src": [],
+                      "description": "Legacy mixed — images and/or videos on field `photos`"
+                    },
+                    {
+                      "key": "onConflict",
+                      "value": "skip",
+                      "type": "text",
+                      "description": "skip | replace | cancel (duplicate filenames)"
+                    }
+                  ]
+                },
+                "description": "Legacy mixed upload. Prefer **Upload photos** or **Upload videos**.",
                 "url": "{{baseUrl}}/api/galleries/{{galleryId}}/uploads"
               },
               "response": []
@@ -2591,7 +4661,12 @@
               "name": "Bulk delete uploads",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"photoIds\": [\"{{photoId}}\"]\n}"
@@ -2616,7 +4691,12 @@
               ],
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"photoIds\": [\"{{photoId}}\"]\n}"
@@ -2681,7 +4761,12 @@
               ],
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"reply\": \"Got it — I'll crop tighter on this one.\"\n}"
@@ -2741,7 +4826,12 @@
               ],
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"watermarkFinalsEnabled\": true\n}"
@@ -2779,7 +4869,11 @@
                       "src": [],
                       "description": "One or more files — each image max 100MB, each video max 1TB (up to 700 files per request)"
                     },
-                    { "key": "clientPaid", "value": "true", "type": "text" }
+                    {
+                      "key": "clientPaid",
+                      "value": "true",
+                      "type": "text"
+                    }
                   ]
                 },
                 "description": "Multipart upload. **Per file:** images max 100MB, videos max 1TB. **Batch:** up to 700 files.",
@@ -2801,9 +4895,21 @@
                       "src": [],
                       "description": "One or more files — each image max 100MB, each video max 1TB (up to 700 files per request)"
                     },
-                    { "key": "clientPaid", "value": "false", "type": "text" },
-                    { "key": "outstandingBalanceGhs", "value": "500", "type": "text" },
-                    { "key": "lockPreviews", "value": "true", "type": "text" }
+                    {
+                      "key": "clientPaid",
+                      "value": "false",
+                      "type": "text"
+                    },
+                    {
+                      "key": "outstandingBalanceGhs",
+                      "value": "500",
+                      "type": "text"
+                    },
+                    {
+                      "key": "lockPreviews",
+                      "value": "true",
+                      "type": "text"
+                    }
                   ]
                 },
                 "description": "Same upload limits as paid finals: images max 100MB each, videos max 1TB each, up to 700 files per batch. Previews locked until client pays.",
@@ -2840,7 +4946,12 @@
               "name": "Reply to flagged final",
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"reply\": \"Thanks — re-editing the skin tones now.\"\n}"
@@ -2854,7 +4965,12 @@
               "name": "Lock final",
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"isLocked\": true,\n  \"amountOwing\": 500\n}"
@@ -2868,7 +4984,12 @@
               "name": "Unlock final",
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"isLocked\": false\n}"
@@ -2891,7 +5012,12 @@
               "name": "Bulk delete finals",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"all\": true\n}"
@@ -2916,7 +5042,12 @@
               ],
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"finalIds\": [\"{{finalId}}\"]\n}"
@@ -2965,7 +5096,12 @@
           "name": "Restore trash items",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"galleryIds\": [\"{{galleryId}}\"],\n  \"photoIds\": [\"{{photoId}}\"]\n}"
@@ -2987,7 +5123,12 @@
           "name": "Empty trash (selected)",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"galleryIds\": [\"{{galleryId}}\"],\n  \"photoIds\": [\"{{photoId}}\"]\n}"
@@ -3040,7 +5181,9 @@
                 }
               ],
               "request": {
-                "auth": { "type": "noauth" },
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "GET",
                 "header": [],
                 "description": "Full payload when unlocked (or no password). Locked galleries return **401** with `accessRequired` / `passwordRequired` only — use **Unlock gallery** for the full payload.",
@@ -3073,9 +5216,16 @@
                 }
               ],
               "request": {
-                "auth": { "type": "noauth" },
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"password\": \"{{galleryPassword}}\"\n}"
@@ -3088,9 +5238,16 @@
             {
               "name": "Toggle selection (heart)",
               "request": {
-                "auth": { "type": "noauth" },
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"photoId\": \"{{photoId}}\",\n  \"comment\": \"Love this shot!\"\n}"
@@ -3103,9 +5260,16 @@
             {
               "name": "Update photo comment",
               "request": {
-                "auth": { "type": "noauth" },
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"photoId\": \"{{photoId}}\",\n  \"comment\": \"Please crop tighter on this one.\"\n}"
@@ -3118,7 +5282,9 @@
             {
               "name": "Submit selections",
               "request": {
-                "auth": { "type": "noauth" },
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "POST",
                 "header": [],
                 "description": "Client submits heart-picks. Can be called again unless `selectionLocked`.",
@@ -3129,9 +5295,16 @@
             {
               "name": "Flag final (with comment)",
               "request": {
-                "auth": { "type": "noauth" },
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"comment\": \"Skin tone looks too warm — please re-edit.\"\n}"
@@ -3144,9 +5317,16 @@
             {
               "name": "Update flagged final comment",
               "request": {
-                "auth": { "type": "noauth" },
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"comment\": \"Updated note: please soften the background.\"\n}"
@@ -3159,7 +5339,9 @@
             {
               "name": "Download final",
               "request": {
-                "auth": { "type": "noauth" },
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "GET",
                 "header": [],
                 "description": "Streams an unlocked final. Returns 403 when final is payment-locked, `allowDownloads` is false, or gallery password not unlocked.",
@@ -3176,7 +5358,9 @@
             {
               "name": "View client gallery by token",
               "request": {
-                "auth": { "type": "noauth" },
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "GET",
                 "header": [],
                 "url": "{{baseUrl}}/api/public/token/{{shareToken}}"
@@ -3206,9 +5390,16 @@
                 }
               ],
               "request": {
-                "auth": { "type": "noauth" },
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"password\": \"{{galleryPassword}}\"\n}"
@@ -3220,9 +5411,16 @@
             {
               "name": "Toggle selection by token",
               "request": {
-                "auth": { "type": "noauth" },
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"photoId\": \"{{photoId}}\"\n}"
@@ -3234,7 +5432,9 @@
             {
               "name": "Download final by token",
               "request": {
-                "auth": { "type": "noauth" },
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "GET",
                 "header": [],
                 "url": "{{baseUrl}}/api/public/token/{{shareToken}}/finals/{{finalId}}/download"
@@ -3283,11 +5483,22 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/bookings?year=2026&month=5",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "bookings"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bookings"
+              ],
               "query": [
-                { "key": "year", "value": "2026" },
-                { "key": "month", "value": "5" }
+                {
+                  "key": "year",
+                  "value": "2026"
+                },
+                {
+                  "key": "month",
+                  "value": "5"
+                }
               ]
             }
           },
@@ -3314,7 +5525,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"title\": \"Consultation & planning\",\n  \"clientId\": \"{{clientId}}\",\n  \"date\": \"2026-05-20\",\n  \"shootType\": \"Wedding\",\n  \"amountCharged\": 2500,\n  \"currency\": \"GHS\",\n  \"start\": \"10:00 AM\",\n  \"end\": \"12:00 PM\",\n  \"location\": \"Studio\",\n  \"notes\": \"Optional notes for this booking\"\n}"
@@ -3347,7 +5563,12 @@
           ],
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"title\": \"Consultation & planning (updated)\",\n  \"date\": \"2026-05-20\",\n  \"shootType\": \"Wedding\",\n  \"amountCharged\": 3000,\n  \"start\": \"11:00 AM\",\n  \"end\": \"1:00 PM\",\n  \"location\": \"Studio B\",\n  \"notes\": \"Updated notes\"\n}"
@@ -3398,9 +5619,19 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/income?year=2026",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "income"],
-              "query": [{ "key": "year", "value": "2026" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "income"
+              ],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026"
+                }
+              ]
             }
           },
           "response": []
@@ -3412,9 +5643,20 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/income/summary?year=2026",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "income", "summary"],
-              "query": [{ "key": "year", "value": "2026" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "income",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026"
+                }
+              ]
             }
           },
           "response": []
@@ -3440,7 +5682,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"date\": \"2026-06-18\",\n  \"clientId\": \"{{clientId}}\",\n  \"title\": \"Wedding — Labadi Beach\",\n  \"shootType\": \"Wedding\",\n  \"totalAmount\": 8500,\n  \"amountPaying\": 8500,\n  \"currency\": \"GHS\",\n  \"bookingId\": \"{{bookingId}}\"\n}"
@@ -3462,7 +5709,12 @@
           "name": "Update income",
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"date\": \"2026-06-18\",\n  \"title\": \"Wedding — Labadi Beach (updated)\",\n  \"shootType\": \"Wedding\",\n  \"totalAmount\": 9000,\n  \"amountPaying\": 4500,\n  \"currency\": \"GHS\"\n}"

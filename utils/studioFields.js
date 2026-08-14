@@ -119,8 +119,6 @@ export const parseStudioInput = (body, { partial = false } = {}) => {
         } else {
             fields.smsSenderId = validation.value
         }
-    } else if (!partial) {
-        errors.push("SMS display name is required")
     }
 
     if (logoRaw !== undefined && logoRaw !== null && logoRaw !== "") {

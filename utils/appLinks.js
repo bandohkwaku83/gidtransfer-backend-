@@ -13,3 +13,6 @@ export const galleryDetailUrl = (galleryId, companySlug) =>
 
 export const dashboardUrl = (companySlug) =>
     `${photographerAppBase(companySlug)}/dashboard`
+
+export const billingUrl = (companySlug) =>
+    `${photographerAppBase(companySlug)}/billing`

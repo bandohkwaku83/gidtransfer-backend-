@@ -2,6 +2,7 @@ import Gallery from "../models/Gallery.js"
 import GalleryPhoto from "../models/GalleryPhoto.js"
 import { isGalleryImageMime } from "./galleryMediaTypes.js"
 import { analyzeGalleryPhoto, galleryAiSelectionEnabled } from "./galleryPhotoAiAnalysis.js"
+import { ownerHasFeature } from "./planFeatures.js"
 import { refreshGalleryAiSuggestions } from "./galleryPhotoAiSuggestions.js"
 import { scheduleGalleryPhotosReindex } from "./opensearchPhotos.js"
 
@@ -252,6 +253,10 @@ export const startGalleryAiAnalysis = async (galleryId, { maxSelections } = {}) 
     const gallery = await Gallery.findById(galleryId)
     if (!gallery) {
         return { enabled: true, runStatus: "idle", queued: 0, error: "not_found" }
+    }
+
+    if (!(await ownerHasFeature(gallery.owner, "galleryAi"))) {
+        return { enabled: false, runStatus: "idle", queued: 0 }
     }
 
     if (gallery.aiSuggestionRunStatus === "running") {

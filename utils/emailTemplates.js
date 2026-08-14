@@ -492,3 +492,83 @@ export const adminPlatformMessageEmail = ({ recipientName, subject, message }) =
         text: `Hi ${recipientName || "there"},\n\n${message}\n\n— The ${brand} team`,
     }
 }
+
+export const planUpgradedEmail = ({
+    studioName,
+    planName,
+    priceGhs,
+    renewalDateLabel,
+    upgradedAtLabel,
+    actionUrl,
+}) => {
+    const title = `You're on the ${planName} plan`
+    const bodyHtml = `
+      ${introLine(studioName, "your studio plan is active. Here are the details:")}
+      ${detailCard([
+          { label: "Plan", value: planName },
+          ...(priceGhs != null
+              ? [{ label: "Price", value: `GHS ${priceGhs}/month` }]
+              : []),
+          ...(upgradedAtLabel
+              ? [{ label: "Upgraded", value: upgradedAtLabel }]
+              : []),
+          ...(renewalDateLabel
+              ? [{ label: "Next renewal", value: renewalDateLabel }]
+              : []),
+      ])}
+      ${bodyParagraph("Manage billing anytime from your studio dashboard.")}
+    `
+
+    return {
+        subject: title,
+        html: layout({
+            label: "Plan upgraded",
+            title,
+            subtitle: `${planName} · Gidtransfer`,
+            bodyHtml,
+            ctaLabel: actionUrl ? "Open billing" : undefined,
+            ctaUrl: actionUrl,
+        }),
+        text: `You're on the ${planName} plan.${priceGhs != null ? `\nPrice: GHS ${priceGhs}/month` : ""}${upgradedAtLabel ? `\nUpgraded: ${upgradedAtLabel}` : ""}${renewalDateLabel ? `\nNext renewal: ${renewalDateLabel}` : ""}${actionUrl ? `\nBilling: ${actionUrl}` : ""}`,
+    }
+}
+
+export const planRenewalReminderEmail = ({
+    studioName,
+    planName,
+    priceGhs,
+    renewalDateLabel,
+    daysLeft = 10,
+    actionUrl,
+}) => {
+    const title = `${planName} renews in ${daysLeft} days`
+    const bodyHtml = `
+      ${introLine(
+          studioName,
+          `your ${escapeHtml(planName)} plan renews in about ${daysLeft} days. Keep your payment method up to date so nothing is interrupted.`
+      )}
+      ${detailCard([
+          { label: "Plan", value: planName },
+          ...(priceGhs != null
+              ? [{ label: "Renewal amount", value: `GHS ${priceGhs}` }]
+              : []),
+          ...(renewalDateLabel
+              ? [{ label: "Renewal date", value: renewalDateLabel }]
+              : []),
+      ])}
+      ${bodyParagraph("You can review or change your plan from billing settings.")}
+    `
+
+    return {
+        subject: title,
+        html: layout({
+            label: "Renewal reminder",
+            title,
+            subtitle: `In ${daysLeft} days`,
+            bodyHtml,
+            ctaLabel: actionUrl ? "Manage billing" : undefined,
+            ctaUrl: actionUrl,
+        }),
+        text: `${planName} renews in ${daysLeft} days.${priceGhs != null ? `\nAmount: GHS ${priceGhs}` : ""}${renewalDateLabel ? `\nRenewal date: ${renewalDateLabel}` : ""}${actionUrl ? `\nBilling: ${actionUrl}` : ""}`,
+    }
+}

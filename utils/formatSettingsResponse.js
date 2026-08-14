@@ -6,8 +6,14 @@ import {
 } from "./formatUserResponse.js"
 import {
     computePercentOfPlan,
+    formatBytesLabel,
     getPlanSummary,
 } from "./storageFields.js"
+import {
+    getEffectiveMaxGalleries,
+    getEffectiveVideoUploadLimitBytes,
+} from "./planCatalog.js"
+import { getUserEntitlements } from "./planFeatures.js"
 import { formatWatermarkResponse } from "./watermarkFields.js"
 import { formatGalleryDefaultsResponse } from "./galleryDefaultsFields.js"
 import { formatEmailNotificationsResponse } from "./emailNotificationFields.js"
@@ -51,6 +57,7 @@ export const formatSettingsResponse = ({
     user,
     galleryCount = 0,
     storageUsedBytes = 0,
+    videoUsedBytes = 0,
 }) => {
     const doc = user.toJSON ? user.toJSON() : user
     const studio = doc.studio ?? {}
@@ -62,6 +69,9 @@ export const formatSettingsResponse = ({
     const avatarSrc = resolveUserAvatarSrc(doc)
     const urlFields = formatStudioUrlFields(studio)
     const plan = getPlanSummary(user)
+    const entitlements = getUserEntitlements(user)
+    const maxGalleries = getEffectiveMaxGalleries(user)
+    const videoUploadLimitBytes = getEffectiveVideoUploadLimitBytes(user)
     const profileComplete = isProfileComplete(doc)
     const memberSince = formatMemberSince(doc.createdAt)
 
@@ -72,6 +82,8 @@ export const formatSettingsResponse = ({
             avatarSrc: avatarSrc ?? logoSrc ?? null,
             planName: plan.planLabel,
             planId: plan.planId,
+            features: entitlements.features,
+            supportTier: entitlements.supportTier,
             profileComplete,
             profileStatusLabel: profileComplete
                 ? "Profile complete"
@@ -80,8 +92,11 @@ export const formatSettingsResponse = ({
         overview: {
             galleries: {
                 used: galleryCount,
-                limit: null,
-                label: String(galleryCount),
+                limit: maxGalleries,
+                label:
+                    maxGalleries == null
+                        ? String(galleryCount)
+                        : `${galleryCount} / ${maxGalleries}`,
             },
             planStorage: {
                 limitBytes: plan.storageLimitBytes,
@@ -92,9 +107,17 @@ export const formatSettingsResponse = ({
                     plan.storageLimitBytes
                 ),
             },
+            videoStorage: {
+                limitBytes: videoUploadLimitBytes,
+                usedBytes: videoUsedBytes,
+                label: formatBytesLabel(videoUploadLimitBytes),
+                percentOfPlan: computePercentOfPlan(
+                    videoUsedBytes,
+                    videoUploadLimitBytes
+                ),
+            },
             memberSince,
-        },
-        studio: {
+        },        studio: {
             businessName: companyName,
             companyName,
             phone: phone || null,

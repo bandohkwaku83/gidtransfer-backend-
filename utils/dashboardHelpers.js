@@ -378,12 +378,17 @@ export const loadRecentActivity = async (ownerId, limit = 10) => {
     return rows.map(formatDashboardActivityItem)
 }
 
-export const formatDashboardStorage = (breakdown, plan) => {
+export const formatDashboardStorage = (breakdown, plan, videoLimitBytes = 0) => {
     const limitBytes = plan.storageLimitBytes
     const usedBytes = breakdown.totalBytes
+    const videoUsedBytes = Number(breakdown.videoUsedBytes) || 0
     const percentOfPlan =
         limitBytes > 0
             ? Math.round((usedBytes / limitBytes) * 10000) / 100
+            : 0
+    const videoPercentOfPlan =
+        videoLimitBytes > 0
+            ? Math.round((videoUsedBytes / videoLimitBytes) * 10000) / 100
             : 0
 
     const rawsPercentOfTotal =
@@ -399,6 +404,9 @@ export const formatDashboardStorage = (breakdown, plan) => {
         planName: plan.planName,
         planId: plan.planId,
         percentOfPlan,
+        videoUsedBytes,
+        videoUploadLimitBytes: videoLimitBytes,
+        videoPercentOfPlan,
         breakdown: {
             rawsBytes: breakdown.rawsBytes,
             selectionsBytes: breakdown.selectionsBytes,
@@ -406,13 +414,13 @@ export const formatDashboardStorage = (breakdown, plan) => {
         },
         focus: {
             category: "raws",
-            categoryLabel: "RAWs",
+            categoryLabel: "Proofs",
             bytes: breakdown.rawsBytes,
             bytesLabel: formatBytesLabel(breakdown.rawsBytes),
             percentOfTotal: rawsPercentOfTotal,
             percentOfTotalLabel:
                 usedBytes > 0
-                    ? `RAWs are ${rawsPercentOfTotal}% of total storage`
+                    ? `Proofs are ${rawsPercentOfTotal}% of plan storage`
                     : "No storage used yet",
         },
     }

@@ -184,7 +184,7 @@ export const parseGalleryPhotoSearchParams = (query = {}) => {
               .map((t) => t.trim())
               .filter(Boolean)
 
-    return {
+    const params = {
         q: q || undefined,
         scene: scene || undefined,
         tags: tags.length ? tags : undefined,
@@ -204,6 +204,20 @@ export const parseGalleryPhotoSearchParams = (query = {}) => {
             String(query.trash) === "1" ||
             String(query.trash || "").toLowerCase() === "true",
     }
+
+    // Prefer explicit mediaType=photo|video over video=true/false when both present.
+    const mediaType = String(
+        query.mediaType ?? query.kind ?? query.type ?? ""
+    )
+        .trim()
+        .toLowerCase()
+    if (mediaType === "photo" || mediaType === "photos" || mediaType === "image") {
+        params.isVideo = false
+    } else if (mediaType === "video" || mediaType === "videos") {
+        params.isVideo = true
+    }
+
+    return params
 }
 
 export const galleryPhotoSearchHasCriteria = (params) => {

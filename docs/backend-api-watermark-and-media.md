@@ -16,9 +16,9 @@ Raw originals remain unmodified in storage (direct S3 PUT or local write). When 
 
 | File | Pattern | Purpose |
 |------|---------|---------|
-| Original | `{uuid}.jpg` | Full-quality master (`url`, `gridUrl`, `viewUrl` for photographers) |
-| Thumbnail | `{uuid}-thumb.jpg` | Default on (`GALLERY_THUMB_MAX_PX`, default 1200) — progressive JPEG `thumbUrl` |
-| Watermarked preview | `{uuid}-preview-wm.jpg` | Client full-screen preview (`displayUrl`) at full resolution |
+| Original | `{uuid}.jpg` | Full-quality master (`url` only — do not use for grids) |
+| Thumbnail | `{uuid}-thumb.jpg` | Default on (`GALLERY_THUMB_MAX_PX`, default **800**) — progressive JPEG used by `thumbUrl` / `gridUrl` |
+| Watermarked preview | `{uuid}-preview-wm.jpg` | Client full-screen preview (`displayUrl` / `viewUrl`) — progressive JPEG |
 
 ---
 
@@ -42,18 +42,22 @@ Returns updated gallery detail including `watermarkPreviewEnabled`.
 
 ---
 
-## `POST /api/galleries/:id/uploads` — raw upload
+## `POST /api/galleries/:id/uploads/photos` · `…/videos` — choose media type in UI
 
-Multipart fields:
+Prefer **separate** endpoints so the photographer UI can offer “Upload photos” vs “Upload videos”:
 
-| Field | Description |
-|-------|-------------|
-| `photos` | One or more image/video files |
-| `applyPreviewWatermark` | `"true"` / `"false"` — when true, generate `{uuid}-preview-wm.jpg` using `WATERMARK_PREVIEW_TEXT` or studio name |
-| `onConflict` | `skip` \| `replace` \| `cancel` |
-| `setId` | Optional gallery set |
+| Endpoint | Multipart field | Accepts |
+|----------|-----------------|---------|
+| `POST …/uploads/photos` | `photos` | Images only (JPG, PNG, WebP, GIF) — max **100MB** each |
+| `POST …/uploads/videos` | `videos` | Videos only (MP4, MOV, WebM, …) — max **1TB** each |
+| `POST …/uploads/photos/presign` + `…/complete` | JSON `files[]` | Images only (S3 direct upload) |
+| `POST …/uploads/videos/presign` + `…/complete` | JSON `files[]` | Videos only (S3 direct upload) |
 
-When `applyPreviewWatermark` is omitted, the server falls back to the gallery's `watermarkPreviewEnabled` value.
+Shared options on all of the above: `applyPreviewWatermark`, `onConflict` (`skip` \| `replace` \| `cancel`), `setId`.
+
+List filter: `GET …/uploads?mediaType=photo` or `?mediaType=video`.
+
+Legacy mixed routes (`POST …/uploads`, `…/presign`, `…/complete`) still accept both types on field `photos` / mixed `files[]`. Optional body/query `mediaType=photo|video` narrows validation.
 
 ### Upload response (`created` / `replaced` items)
 

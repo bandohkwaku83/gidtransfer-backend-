@@ -22,6 +22,11 @@ import {
     getIssueReportForm,
     submitIssueReport,
 } from "../controllers/issueReportController.js"
+import {
+    createApiToken,
+    listApiTokens,
+    revokeApiToken,
+} from "../controllers/apiTokenController.js"
 import { handleUploadSettings } from "../middleware/uploadSettings.js"
 import { handleUploadWatermarkLogo } from "../middleware/uploadWatermark.js"
 import { handleUploadGalleryDefaultCover } from "../middleware/uploadGalleryDefaults.js"
@@ -68,6 +73,10 @@ router.delete(
     "/gallery-defaults/default-cover",
     deleteGalleryDefaultsCover
 )
+
+router.get("/api-tokens", listApiTokens)
+router.post("/api-tokens", createApiToken)
+router.delete("/api-tokens/:tokenId", revokeApiToken)
 
 router.get("/report-issue", getIssueReportForm)
 router.get("/help-support", getIssueReportForm)

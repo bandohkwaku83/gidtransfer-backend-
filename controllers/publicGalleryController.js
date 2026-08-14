@@ -67,6 +67,7 @@ import {
 } from "../utils/galleryPhotoAiQueue.js"
 import { loadGalleryAiSuggestions } from "../utils/galleryPhotoAiSuggestions.js"
 import { galleryAiSelectionEnabled } from "../utils/galleryPhotoAiAnalysis.js"
+import { featureDeniedPayload, ownerHasFeature } from "../utils/planFeatures.js"
 import {
     scheduleGalleryPhotoIndex,
     scheduleGalleryPhotosReindex,
@@ -78,11 +79,55 @@ function galleryClientName(gallery) {
     return gallery.client?.name?.trim() || "Your client"
 }
 
+const publicAiDisabledPayload = () => ({
+    enabled: false,
+    runStatus: "idle",
+})
+
+async function publicGalleryAiAllowed(gallery) {
+    if (!galleryAiSelectionEnabled()) return false
+    return ownerHasFeature(gallery.owner, "galleryAi")
+}
+
+async function publicGalleryCommentsAllowed(gallery) {
+    return ownerHasFeature(gallery.owner, "galleryComments")
+}
+
+async function denyPublicGalleryComments(gallery, res) {
+    if (await publicGalleryCommentsAllowed(gallery)) return false
+    res.status(403).json({
+        ...featureDeniedPayload("galleryComments"),
+        message:
+            "Commenting and flagging images is available on the Basic, Pro, or Premium plan.",
+    })
+    return true
+}
+
+async function denyPublicGalleryAi(gallery, res) {
+    if (!galleryAiSelectionEnabled()) {
+        res.status(503).json({
+            message: "AI selection is not enabled on this server",
+            aiSelection: publicAiDisabledPayload(),
+        })
+        return true
+    }
+    if (!(await publicGalleryAiAllowed(gallery))) {
+        res.status(403).json({
+            message: "Gallery AI is not included on this studio's plan.",
+            code: "PLAN_FEATURE_REQUIRED",
+            feature: "galleryAi",
+            aiSelection: publicAiDisabledPayload(),
+        })
+        return true
+    }
+    return false
+}
+
 function queueGalleryEmail(promise) {
     queuePhotographerEmail(promise)
 }
 
-function formatPublicGalleryMeta(gallery, { selectedCount = 0 } = {}) {
+function formatPublicGalleryMeta(gallery, { selectedCount = 0, commentsEnabled = false } = {}) {
     const { coverImageUrl, coverFocalX, coverFocalY } =
         resolvePublicGalleryCover(gallery)
     const maxSelections = gallery.maxSelections ?? null
@@ -129,6 +174,7 @@ function formatPublicGalleryMeta(gallery, { selectedCount = 0 } = {}) {
                 ? resolveMediaUrl(gallery.backgroundMusicUrl)
                 : null,
         clientName: gallery.client?.name ?? null,
+        commentsEnabled,
         ...formatGallerySetsSettingsResponse(gallery),
     }
 }
@@ -224,14 +270,18 @@ async function buildPublicGalleryPayload(hit, { query } = {}) {
         { formatPhoto, formatFinal }
     )
 
+    const commentsEnabled = await publicGalleryCommentsAllowed(gallery)
+
     return {
         accessRequired: false,
         emailGateEnabled: gallery.emailGateEnabled === true,
         gallery: formatPublicGalleryMeta(gallery, {
             selectedCount: selected.length,
+            commentsEnabled,
         }),
         folder: formatPublicGalleryMeta(gallery, {
             selectedCount: selected.length,
+            commentsEnabled,
         }),
         studio: formatPublicStudioResponse(owner.studio, companySlug),
         sets,
@@ -267,7 +317,9 @@ async function buildPublicGalleryPayload(hit, { query } = {}) {
                   }),
               }
             : {}),
-        aiSelection: await galleryAiAnalysisSummary(gallery._id),
+        aiSelection: (await publicGalleryAiAllowed(gallery))
+            ? await galleryAiAnalysisSummary(gallery._id)
+            : publicAiDisabledPayload(),
     }
 }
 
@@ -299,7 +351,11 @@ function ensurePublicGalleryAccess(hit, req, res) {
 async function buildPublicGalleryMetaPayload(hit) {
     const { gallery, owner } = hit
     const companySlug = owner.studio?.companySlug ?? null
-    const galleryMeta = formatPublicGalleryMeta(gallery, { selectedCount: 0 })
+    const commentsEnabled = await publicGalleryCommentsAllowed(gallery)
+    const galleryMeta = formatPublicGalleryMeta(gallery, {
+        selectedCount: 0,
+        commentsEnabled,
+    })
 
     return {
         accessRequired: true,
@@ -509,6 +565,10 @@ async function toggleSelectionForGallery(gallery, req, res) {
             ? String(req.body.comment).trim()
             : undefined
 
+    if (comment) {
+        if (await denyPublicGalleryComments(gallery, res)) return
+    }
+
     if (photo.selectedByClient) {
         photo.selectedByClient = false
         photo.selectedAt = null
@@ -572,6 +632,7 @@ export const togglePublicSelection = (req, res) =>
     )
 
 async function updateCommentForGallery(gallery, req, res) {
+    if (await denyPublicGalleryComments(gallery, res)) return
     if (!canEditSelections(gallery)) {
         return selectionLockedResponse(res)
     }
@@ -622,6 +683,7 @@ export const updatePublicPhotoComment = (req, res) =>
     )
 
 async function flagFinalForGallery(gallery, req, res) {
+    if (await denyPublicGalleryComments(gallery, res)) return
     if (gallery.finalDeliveryEnabled === false) {
         return res.status(404).json({ message: "Final delivery is not enabled" })
     }
@@ -766,12 +828,7 @@ async function buildPublicAiSuggestionsPayload(gallery, photoOptions) {
 
 export const getPublicAiSuggestions = (req, res) =>
     handlePublicMutation(req, res, async ({ gallery }, req, res) => {
-        if (!galleryAiSelectionEnabled()) {
-            return res.status(503).json({
-                message: "AI selection is not enabled on this server",
-                aiSelection: { enabled: false, runStatus: "idle" },
-            })
-        }
+        if (await denyPublicGalleryAi(gallery, res)) return
 
         const payload = await buildPublicAiSuggestionsPayload(gallery, {
             absoluteUrls: true,
@@ -833,12 +890,7 @@ export const searchPublicGalleryPhotos = (req, res) =>
 
 export const startPublicAiSuggestions = (req, res) =>
     handlePublicMutation(req, res, async ({ gallery }, req, res) => {
-        if (!galleryAiSelectionEnabled()) {
-            return res.status(503).json({
-                message: "AI selection is not enabled on this server",
-                aiSelection: { enabled: false, runStatus: "idle" },
-            })
-        }
+        if (await denyPublicGalleryAi(gallery, res)) return
 
         const result = await startGalleryAiAnalysis(gallery._id, {
             maxSelections: gallery.maxSelections ?? null,
@@ -853,12 +905,7 @@ export const startPublicAiSuggestions = (req, res) =>
 
 export const pausePublicAiSuggestions = (req, res) =>
     handlePublicMutation(req, res, async ({ gallery }, req, res) => {
-        if (!galleryAiSelectionEnabled()) {
-            return res.status(503).json({
-                message: "AI selection is not enabled on this server",
-                aiSelection: { enabled: false, runStatus: "idle" },
-            })
-        }
+        if (await denyPublicGalleryAi(gallery, res)) return
 
         const result = await pauseGalleryAiAnalysis(gallery._id)
         return res.status(200).json({
@@ -869,12 +916,7 @@ export const pausePublicAiSuggestions = (req, res) =>
 
 export const resumePublicAiSuggestions = (req, res) =>
     handlePublicMutation(req, res, async ({ gallery }, req, res) => {
-        if (!galleryAiSelectionEnabled()) {
-            return res.status(503).json({
-                message: "AI selection is not enabled on this server",
-                aiSelection: { enabled: false, runStatus: "idle" },
-            })
-        }
+        if (await denyPublicGalleryAi(gallery, res)) return
 
         const current = await galleryAiAnalysisSummary(gallery._id)
         if (current.runStatus !== "paused" && current.runStatus !== "idle") {
@@ -906,12 +948,7 @@ export const resumePublicAiSuggestions = (req, res) =>
 
 export const terminatePublicAiSuggestions = (req, res) =>
     handlePublicMutation(req, res, async ({ gallery }, req, res) => {
-        if (!galleryAiSelectionEnabled()) {
-            return res.status(503).json({
-                message: "AI selection is not enabled on this server",
-                aiSelection: { enabled: false, runStatus: "idle" },
-            })
-        }
+        if (await denyPublicGalleryAi(gallery, res)) return
 
         const result = await terminateGalleryAiAnalysis(gallery._id)
         return res.status(200).json({
@@ -927,11 +964,7 @@ async function applyAiSuggestionsForGallery(gallery, req, res) {
         return selectionLockedResponse(res)
     }
 
-    if (!galleryAiSelectionEnabled()) {
-        return res.status(503).json({
-            message: "AI selection is not enabled on this server",
-        })
-    }
+    if (await denyPublicGalleryAi(gallery, res)) return
 
     const replaceExisting = req.body?.replaceExisting === true
     const requestedIds = Array.isArray(req.body?.photoIds)
@@ -1037,6 +1070,10 @@ async function toggleRejectForGallery(gallery, req, res) {
             ? String(req.body.comment).trim()
             : undefined
 
+    if (comment) {
+        if (await denyPublicGalleryComments(gallery, res)) return
+    }
+
     if (photo.rejectedByClient) {
         photo.rejectedByClient = false
         photo.rejectedAt = null
@@ -1087,6 +1124,7 @@ async function loadPublicFinal(gallery, finalId) {
 }
 
 async function updateFinalCommentForGallery(gallery, req, res) {
+    if (await denyPublicGalleryComments(gallery, res)) return
     if (gallery.finalDeliveryEnabled === false) {
         return res.status(404).json({ message: "Final delivery is not enabled" })
     }

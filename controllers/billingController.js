@@ -4,6 +4,7 @@ import BillingEvent from "../models/BillingEvent.js"
 import {
     PaystackError,
     disablePaystackSubscription,
+    fetchPaystackPlan,
     fetchPaystackSubscription,
     initializePaystackTransaction,
     paystackConfigured,
@@ -13,16 +14,18 @@ import {
 import {
     getPlanById,
     getPlanByPaystackCode,
+    normalizePlanId,
     planAmountPesewas,
 } from "../utils/planCatalog.js"
 import {
     applySubscriptionFromPaystack,
-    formatBillingPlansResponse,
+    formatBillingPlansPayload,
     formatBillingSubscriptionResponse,
     getPlanSummaryForUser,
     isPaidSubscriptionActive,
     resetSubscriptionToFree,
 } from "../utils/subscriptionFields.js"
+import { queueNotifyPlanUpgraded } from "../utils/photographerBillingNotify.js"
 
 const handleBillingError = (res, error) => {
     if (error instanceof PaystackError) {
@@ -54,6 +57,28 @@ const billingCallbackUrl = () => {
     if (appUrl) return `${appUrl}/billing/callback`
 
     return undefined
+}
+
+/**
+ * Paystack charges the amount stored on the plan object, not the amount we pass
+ * to transaction/initialize. Refuse checkout when the remote plan is stale.
+ */
+const assertPaystackPlanAmountMatches = async (plan) => {
+    const remote = await fetchPaystackPlan(plan.paystackPlanCode)
+    const expected = planAmountPesewas(plan)
+    const remoteAmount = Number(remote?.amount)
+    if (!Number.isFinite(remoteAmount) || remoteAmount !== expected) {
+        const remoteGhs = Number.isFinite(remoteAmount)
+            ? remoteAmount / 100
+            : null
+        const err = new Error(
+            `Paystack plan ${plan.paystackPlanCode} is GHS ${remoteGhs ?? "?"} but the app expects GHS ${plan.priceGhs}. Run node scripts/createPaystackPlans.js and update PAYSTACK_PLAN_* in .env.`
+        )
+        err.statusCode = 503
+        err.code = "PAYSTACK_PLAN_AMOUNT_MISMATCH"
+        throw err
+    }
+    return remote
 }
 
 const parsePaystackDate = (value) => {
@@ -104,7 +129,7 @@ const activateUserSubscription = async ({
         await disableExistingSubscription(user)
     }
 
-    applySubscriptionFromPaystack({
+    const { planChanged, nextPlanId } = applySubscriptionFromPaystack({
         user,
         planId,
         subscriptionCode,
@@ -117,6 +142,11 @@ const activateUserSubscription = async ({
     })
 
     await user.save()
+
+    if (planChanged && nextPlanId && nextPlanId !== "free") {
+        queueNotifyPlanUpgraded(user)
+    }
+
     return user
 }
 
@@ -130,12 +160,48 @@ const resolvePlanIdFromMetadata = (metadata = {}) => {
     return planId ? String(planId).trim().toLowerCase() : ""
 }
 
-const markBillingEventProcessed = async ({ eventId, eventType, reference }) => {
+export const categorizeBillingEventType = (eventType) => {
+    const type = String(eventType ?? "").trim().toLowerCase()
+    if (
+        type === "charge.success" ||
+        type === "subscription.create" ||
+        type === "invoice.update" ||
+        type === "invoice.create"
+    ) {
+        return "paid"
+    }
+    if (
+        type === "invoice.payment_failed" ||
+        type === "charge.failed" ||
+        type === "subscription.not_renew"
+    ) {
+        return "failed"
+    }
+    if (type.includes("dispute") || type === "charge.dispute.create") {
+        return "dispute"
+    }
+    return "other"
+}
+
+const markBillingEventProcessed = async ({
+    eventId,
+    eventType,
+    reference,
+    userId = null,
+    amount = null,
+    currency = "",
+    status = "",
+}) => {
     try {
         await BillingEvent.create({
             eventId,
             eventType,
+            category: categorizeBillingEventType(eventType),
             reference: reference || "",
+            user: userId || null,
+            amount,
+            currency: currency || "",
+            status: status || "",
         })
         return true
     } catch (error) {
@@ -211,12 +277,7 @@ export const getBillingConfig = async (_req, res) => {
 export const listBillingPlans = async (req, res) => {
     try {
         const currentPlanId = getPlanSummaryForUser(req.user).planId
-        const plans = formatBillingPlansResponse().map((plan) => ({
-            ...plan,
-            current: plan.id === currentPlanId,
-        }))
-
-        return res.status(200).json({ plans })
+        return res.status(200).json(formatBillingPlansPayload(currentPlanId))
     } catch (error) {
         return handleBillingError(res, error)
     }
@@ -241,9 +302,7 @@ export const checkoutBillingPlan = async (req, res) => {
             })
         }
 
-        const planId = String(req.body?.planId ?? req.body?.plan ?? "")
-            .trim()
-            .toLowerCase()
+        const planId = normalizePlanId(req.body?.planId ?? req.body?.plan ?? "")
 
         if (!planId || planId === "free") {
             return res.status(400).json({
@@ -263,6 +322,8 @@ export const checkoutBillingPlan = async (req, res) => {
             })
         }
 
+        await assertPaystackPlanAmountMatches(plan)
+
         const currentPlanId = getPlanSummaryForUser(req.user).planId
         if (currentPlanId === planId && isPaidSubscriptionActive(req.user)) {
             return res.status(409).json({
@@ -281,6 +342,8 @@ export const checkoutBillingPlan = async (req, res) => {
         // Paystack requires transaction/initialize (with plan) for customers
         // without a saved card authorization. POST /subscription only works
         // after the customer has already paid once on this integration.
+        // Important: when `plan` is set, Paystack charges the plan's amount
+        // (not a custom amount) — keep PAYSTACK_PLAN_* codes in sync with catalog.
         const transaction = await initializePaystackTransaction({
             email: user.email,
             plan: plan.paystackPlanCode,
@@ -298,6 +361,9 @@ export const checkoutBillingPlan = async (req, res) => {
             checkout: {
                 planId: plan.id,
                 planName: plan.name,
+                priceGhs: plan.priceGhs,
+                amountPesewas: planAmountPesewas(plan),
+                currency: "GHS",
                 authorizationUrl: transaction.authorization_url,
                 accessCode: transaction.access_code,
                 reference: transaction.reference || null,
@@ -305,6 +371,12 @@ export const checkoutBillingPlan = async (req, res) => {
             },
         })
     } catch (error) {
+        if (error?.code === "PAYSTACK_PLAN_AMOUNT_MISMATCH") {
+            return res.status(503).json({
+                message: error.message,
+                code: error.code,
+            })
+        }
         return handleBillingError(res, error)
     }
 }
@@ -336,6 +408,34 @@ export const cancelBillingSubscription = async (req, res) => {
     }
 }
 
+const clearPendingCheckout = async (userId) => {
+    const user = await loadUserWithSubscriptionSecrets(userId)
+    if (!user) return null
+
+    const sub = user.subscription ?? {}
+    if (sub.status !== "pending" && !sub.pendingPlanId) {
+        return user
+    }
+
+    user.subscription = user.subscription ?? {}
+    user.subscription.pendingPlanId = ""
+
+    if (user.subscription.status === "pending") {
+        const planId = normalizePlanId(user.subscription.planId)
+        const hasExistingPaid =
+            planId &&
+            planId !== "free" &&
+            Boolean(user.subscription.paystackSubscriptionCode?.trim())
+        user.subscription.status = hasExistingPaid ? "active" : "free"
+        if (!hasExistingPaid) {
+            user.subscription.planId = "free"
+        }
+    }
+
+    await user.save()
+    return user
+}
+
 export const verifyBillingPayment = async (req, res) => {
     try {
         const reference = String(
@@ -357,6 +457,35 @@ export const verifyBillingPayment = async (req, res) => {
         if (!userId || !planId) {
             return res.status(400).json({
                 message: "Payment verified but subscription metadata is missing",
+            })
+        }
+
+        const authedUserId = String(req.user?._id ?? "")
+        if (authedUserId && authedUserId !== userId) {
+            return res.status(403).json({
+                message: "This payment does not belong to the signed-in account",
+                code: "PAYMENT_USER_MISMATCH",
+                verified: false,
+            })
+        }
+
+        const paystackStatus = String(transaction.status ?? "")
+            .trim()
+            .toLowerCase()
+        const paid = paystackStatus === "success"
+
+        if (!paid) {
+            const user = await clearPendingCheckout(userId)
+            return res.status(200).json({
+                message:
+                    paystackStatus === "abandoned"
+                        ? "Payment was not completed"
+                        : "Payment was declined or failed",
+                verified: false,
+                status: paystackStatus || "failed",
+                subscription: user
+                    ? formatBillingSubscriptionResponse(user)
+                    : formatBillingSubscriptionResponse(req.user),
             })
         }
 
@@ -396,7 +525,8 @@ export const verifyBillingPayment = async (req, res) => {
 
         return res.status(200).json({
             message: "Payment verified",
-            verified: transaction.status === "success",
+            verified: true,
+            status: "success",
             subscription: formatBillingSubscriptionResponse(user),
         })
     } catch (error) {
@@ -441,17 +571,30 @@ export const paystackWebhook = async (req, res) => {
             event?.data?.code ||
             ""
 
+        const metadata = event?.data?.metadata ?? {}
+        const webhookUserId = resolveUserIdFromMetadata(metadata)
+        const amountRaw =
+            event?.data?.amount ??
+            event?.data?.requested_amount ??
+            event?.data?.paid_amount
+        const amount =
+            amountRaw != null && Number.isFinite(Number(amountRaw))
+                ? Number(amountRaw) / 100
+                : null
+
         const isNew = await markBillingEventProcessed({
             eventId,
             eventType,
             reference,
+            userId: webhookUserId || null,
+            amount,
+            currency: event?.data?.currency || "",
+            status: event?.data?.status || eventType || "",
         })
 
         if (!isNew) {
             return res.status(200).send("Already processed")
         }
-
-        const metadata = event?.data?.metadata ?? {}
 
         if (
             eventType === "subscription.create" ||

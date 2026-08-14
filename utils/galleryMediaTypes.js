@@ -29,6 +29,40 @@ export const isGalleryImageMime = (mime) => GALLERY_IMAGE_MIME.has(mime)
 export const isAllowedGalleryMediaMime = (mime) =>
     isGalleryImageMime(mime) || isGalleryVideoMime(mime)
 
+/**
+ * UI chooses photo vs video upload.
+ * Accepts: photo|photos|image|images → "photo"; video|videos → "video".
+ */
+export const parseGalleryUploadKind = (value) => {
+    const raw = String(value ?? "")
+        .trim()
+        .toLowerCase()
+    if (!raw) return null
+    if (raw === "photo" || raw === "photos" || raw === "image" || raw === "images") {
+        return "photo"
+    }
+    if (raw === "video" || raw === "videos") {
+        return "video"
+    }
+    return null
+}
+
+export const mimeMatchesGalleryUploadKind = (mime, kind) => {
+    if (kind === "photo") return isGalleryImageMime(mime)
+    if (kind === "video") return isGalleryVideoMime(mime)
+    return isAllowedGalleryMediaMime(mime)
+}
+
+export const galleryMediaValidationErrorForKind = (kind) => {
+    if (kind === "photo") {
+        return "File must be an image (JPG, PNG, WebP, GIF). Use the video upload endpoint for videos."
+    }
+    if (kind === "video") {
+        return "File must be a video (MP4, MOV, WebM, etc.). Use the photo upload endpoint for images."
+    }
+    return galleryMediaValidationError()
+}
+
 export const extensionForGalleryMediaMime = (mime) => {
     if (mime === "image/png") return ".png"
     if (mime === "image/webp") return ".webp"

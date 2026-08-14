@@ -16,14 +16,15 @@ import {
 
 const parseThumbMaxPx = () => {
     const raw = process.env.GALLERY_THUMB_MAX_PX?.trim()
-    // Default on (1200) for progressive JPEG grid delivery; set 0 to disable.
-    if (raw === undefined || raw === "") return 1200
+    // Default on (800) for progressive JPEG grid delivery; set 0 to disable.
+    // 800 keeps retina tiles sharp without shipping camera-sized masters in the grid.
+    if (raw === undefined || raw === "") return 800
     const n = Number(raw)
     if (!Number.isFinite(n) || n <= 0) return 0
     return Math.max(320, Math.floor(n))
 }
 
-/** Optional grid thumbnails — default 1200px progressive JPEG; set GALLERY_THUMB_MAX_PX=0 to disable. Originals are never resized. */
+/** Optional grid thumbnails — default 800px progressive JPEG; set GALLERY_THUMB_MAX_PX=0 to disable. Originals are never resized. */
 export const galleryThumbMaxPx = () => parseThumbMaxPx()
 
 const escapeXml = (value) =>
@@ -59,11 +60,6 @@ const tiledWatermarkSvg = (text, width, height) => {
 </svg>`)
 }
 
-const derivativeExtension = (storedFilename) => {
-    const ext = path.extname(storedFilename).toLowerCase()
-    return ext && ext !== "." ? ext : ".jpg"
-}
-
 /** Progressive JPEG for faster perceived loading (grid thumbs). */
 const thumbJpegQuality = () => {
     const n = Number(process.env.GALLERY_THUMB_JPEG_QUALITY)
@@ -81,11 +77,10 @@ const previewJpegQuality = () => {
 const derivativeNames = (storedFilename) => {
     const parsed = path.parse(storedFilename)
     const base = parsed.name
-    const ext = derivativeExtension(storedFilename)
     return {
-        // Thumbs are always progressive JPEG for faster grid paint.
+        // Always progressive JPEG — avoids baseline top-to-bottom paint on grid/lightbox.
         thumbStoredFilename: `${base}-thumb.jpg`,
-        previewWmStoredFilename: `${base}-preview-wm${ext}`,
+        previewWmStoredFilename: `${base}-preview-wm.jpg`,
     }
 }
 
@@ -97,32 +92,8 @@ const applyProgressiveJpeg = (pipeline, quality) =>
         chromaSubsampling: "4:2:0",
     })
 
-const applyOutputFormat = (pipeline, meta, { quality = 90 } = {}) => {
-    const format = (meta.format ?? "jpeg").toLowerCase()
-    switch (format) {
-        case "png":
-            return pipeline.png({ compressionLevel: 6 })
-        case "webp":
-            return pipeline.webp({ quality: Math.min(100, quality), effort: 4 })
-        case "gif":
-            return pipeline.gif()
-        case "jpeg":
-        case "jpg":
-        default:
-            return applyProgressiveJpeg(pipeline, quality)
-    }
-}
-
 const galleryPhotoPath = (galleryId, storedFilename) =>
     path.join(GALLERY_PHOTOS_DIR, String(galleryId), storedFilename)
-
-const mimeForDerivative = (storedFilename) => {
-    const ext = path.extname(storedFilename).toLowerCase()
-    if (ext === ".png") return "image/png"
-    if (ext === ".webp") return "image/webp"
-    if (ext === ".gif") return "image/gif"
-    return "image/jpeg"
-}
 
 const readSourceBuffer = async (galleryId, storedFilename) => {
     if (s3Configured()) {
@@ -224,17 +195,18 @@ export async function generateGalleryPhotoDerivatives({
             info.height ?? meta.height ?? 1
         )
 
-        const previewBuffer = await applyOutputFormat(
+        // Always progressive JPEG (even when the master is PNG/WebP) so lightbox
+        // paint is full-frame early instead of top-to-bottom baseline decode.
+        const previewBuffer = await applyProgressiveJpeg(
             sharp(data).composite([{ input: overlay, blend: "over" }]),
-            meta,
-            { quality: previewJpegQuality() }
+            previewJpegQuality()
         ).toBuffer()
 
         await writeDerivative(
             galleryId,
             previewWmStoredFilename,
             previewBuffer,
-            mimeForDerivative(previewWmStoredFilename)
+            "image/jpeg"
         )
     } else {
         await removeDerivative(galleryId, previewWmStoredFilename)

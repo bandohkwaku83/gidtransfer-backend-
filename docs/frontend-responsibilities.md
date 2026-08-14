@@ -108,9 +108,9 @@ NEXT_PUBLIC_GOOGLE_CLIENT_ID=<same as backend GOOGLE_CLIENT_ID>
 | Galleries | `/api/galleries` | Create, customize, uploads, finals, share links |
 | Public gallery (client view) | `/api/public/:companySlug/:gallerySlug` | Client-facing; can live on same domain |
 | Trash | `/api/trash` | Restore / empty |
-| Settings | `/api/settings` | Profile, studio, watermark, gallery defaults |
+| Settings | `/api/settings` | Profile, studio, watermark, gallery defaults, API tokens (Business) |
 | **Help & support** | `GET/POST /api/settings/help-support` | Photographer **submits** issue reports here |
-| Billing | `/api/billing/*` | Plans, checkout, subscription, Paystack callback |
+| Billing | `/api/billing/*` | Plans + feature matrix, checkout, subscription, Paystack callback. See [`billing-plans-frontend.md`](./billing-plans-frontend.md) |
 | Storage | `GET /api/storage` | Usage breakdown |
 | SMS / email test | `/api/sms/*`, `/api/email/*` | Studio tooling |
 | Sync / realtime | `/api/sync/*`, `GET /api/events/stream` | Optional incremental sync + SSE |
@@ -125,7 +125,7 @@ NEXT_PUBLIC_GOOGLE_CLIENT_ID=<same as backend GOOGLE_CLIENT_ID>
 
 ## Admin frontend (separate project)
 
-**Who uses it:** platform staff managing photographers, support tickets, and studio SMS sender IDs.
+**Who uses it:** platform staff managing photographers, galleries, CRM aggregates, billing, support tickets, and studio SMS sender IDs.
 
 ### Environment (admin frontend project)
 
@@ -159,13 +159,26 @@ Admin accounts are created via backend script (`node scripts/createAdmin.js`) or
 | **Deactivate** | `PATCH /api/admin/photographers/:userId/deactivate` | Disables login, revokes sessions |
 | **Verify email** | `POST /api/admin/photographers/:userId/verify-email` | Manual verify without OTP |
 | Sessions | `GET /api/admin/photographers/:userId/sessions` | Active / historical logins |
+| **Gallery inspector** | `GET /api/admin/galleries` | Search: `slug`, `studioEmail`, `clientName`, `dateFrom`/`dateTo`, `status`, `shared` |
+| Gallery detail | `GET /api/admin/galleries/:galleryId` | Status, share password flag, expiry, selection locks; photographer gallery counts |
+| Galleries by studio | `GET /api/admin/photographers/:userId/galleries` | Count + list for one photographer |
+| Share revoke / extend | `POST .../share/revoke`, `POST .../share/extend` | Body includes `reason` |
+| Disable downloads / lock | `PATCH .../share` | `allowDownloads`, `selectionLocked`, `reason` |
+| Moderation queue | `GET /api/admin/moderation/flagged-finals` | Client-flagged finals platform-wide |
+| Platform trash | `GET /api/admin/trash` | Soft-deleted galleries |
+| Purge / restore | `POST /trash/purge-expired`, `DELETE .../purge`, `POST .../restore` | Destructive actions require `reason` |
+| **Aggregate CRM** | `GET /api/admin/crm/studios` | Total clients per studio (no client PII) |
+| Studio CRM summary | `GET /api/admin/crm/studios/:userId` | Counts; `includePii=true&reason=` logs role + reason |
+| Bookings calendar | `GET /api/admin/crm/bookings` | Filter `ownerId`, `dateFrom`/`dateTo`, `shootType`; PII gated |
 | **Issue reports (support inbox)** | `GET /api/admin/issue-reports` | View reports photographers submitted |
 | Resolve / reopen report | `PATCH /api/admin/issue-reports/:id` | Body: `{ "status": "resolved" \| "open" }` |
 | SMS sender IDs | `GET /api/admin/sms/sender-ids` | Pending approvals |
 | Approve / reject sender | `PATCH .../approve`, `PATCH .../reject` | Studio SMS display name |
-| Bulk comms | `POST /api/admin/communications/sms`, `.../email` | Message many photographers |
-| Direct message | `POST /api/admin/photographers/:userId/communicate` | Email and/or SMS one photographer |
+| Bulk / direct messaging | `POST /api/admin/communications/sms`, `.../email`, `.../photographers/:userId/communicate` | Email and/or SMS to photographers |
 | Comms history | `GET /api/admin/communications` | Audit log |
+| **Billing plans** | `GET/PATCH /api/admin/billing/plans/:planId` | Edit `storageLimitBytes`, `maxGalleries`, `perks`, `priceGhs` |
+| Per-studio limit bump | `PUT /api/admin/photographers/:userId/limit-override` | Temporary storage/gallery overrides |
+| Billing events | `GET /api/admin/billing/events` | `category=paid\|failed\|dispute\|other` |
 
 ### Support flow (cross-app)
 
@@ -175,7 +188,8 @@ Admin accounts are created via backend script (`node scripts/createAdmin.js`) or
 ### Admin frontend must NOT
 
 - Call photographer auth (`/api/auth/register`, `/api/auth/login`, etc.).
-- Implement gallery upload, client management, bookings, or billing checkout.
+- Implement gallery upload, client CRUD for studios, or photographer Paystack checkout.
+- Export CRM PII without passing `includePii=true` and a logged `reason`.
 - Use photographer JWT for admin API calls.
 
 ---
@@ -187,16 +201,23 @@ Admin accounts are created via backend script (`node scripts/createAdmin.js`) or
 | Register / login photographers | ✓ | |
 | Onboarding & studio setup | ✓ | |
 | Galleries, clients, bookings, income | ✓ | |
-| Billing / Paystack | ✓ | |
+| Billing / Paystack checkout | ✓ | |
 | Submit help & support report | ✓ | |
 | Admin login | | ✓ |
 | View platform stats | | ✓ |
 | List / manage photographers | | ✓ |
 | Activate / deactivate photographer | | ✓ |
 | Verify photographer email | | ✓ |
+| Gallery inspector / share admin / trash | | ✓ |
+| Aggregate CRM / bookings calendar | | ✓ |
+| Plan catalog / limit overrides / billing events | | ✓ |
 | View / resolve issue reports | | ✓ |
 | Approve / reject SMS sender IDs | | ✓ |
 | Send platform SMS / email to photographers | | ✓ |
+
+**Admin API integration (screens, query params, sample JSON):** [`admin-frontend-integration.md`](./admin-frontend-integration.md).  
+**Photographer billing / plan features:** [`billing-plans-frontend.md`](./billing-plans-frontend.md) (full plans & feature matrix).
+
 
 ---
 

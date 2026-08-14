@@ -5,9 +5,9 @@ import { fileURLToPath } from "url"
 import {
     MAX_GALLERY_VIDEO_BYTES,
     extensionForGalleryMediaMime,
-    galleryMediaValidationError,
-    isAllowedGalleryMediaMime,
+    galleryMediaValidationErrorForKind,
     isGalleryVideoMime,
+    mimeMatchesGalleryUploadKind,
     validateGalleryMediaFileSize,
     maxGalleryMediaBytesForMime,
 } from "./galleryMediaTypes.js"
@@ -45,19 +45,22 @@ export const ensureGalleryPhotosDir = (galleryId) => {
     return dir
 }
 
-export const validateGalleryPhotoFile = (file) => {
+export const validateGalleryPhotoFile = (file, { kind = null } = {}) => {
     if (!file) return "No file provided"
-    if (!isAllowedGalleryMediaMime(file.mimetype)) {
-        return galleryMediaValidationError()
+    if (!mimeMatchesGalleryUploadKind(file.mimetype, kind)) {
+        return galleryMediaValidationErrorForKind(kind)
     }
     const sizeError = validateGalleryMediaFileSize(file)
     if (sizeError) return sizeError
     return null
 }
 
-export const validateGalleryPhotoMeta = ({ mimeType, sizeBytes }) => {
-    if (!mimeType || !isAllowedGalleryMediaMime(mimeType)) {
-        return galleryMediaValidationError()
+export const validateGalleryPhotoMeta = (
+    { mimeType, sizeBytes },
+    { kind = null } = {}
+) => {
+    if (!mimeType || !mimeMatchesGalleryUploadKind(mimeType, kind)) {
+        return galleryMediaValidationErrorForKind(kind)
     }
     const maxBytes = maxGalleryMediaBytesForMime(mimeType)
     if (maxBytes > 0 && sizeBytes > maxBytes) {

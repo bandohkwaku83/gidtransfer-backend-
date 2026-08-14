@@ -5,6 +5,7 @@ import {
     formatSmsSenderFields,
     sendStudioSms,
 } from "../utils/studioSms.js"
+import { sendFeatureDenied, userHasFeature } from "../utils/planFeatures.js"
 
 const handleSmsError = (res, error) => {
     if (error instanceof ArkeselSmsError) {
@@ -22,16 +23,31 @@ const handleSmsError = (res, error) => {
 
 export const getSmsConfig = async (req, res) => {
     const studio = req.user.studio ?? {}
+    const available = userHasFeature(req.user, "smsNotifications")
 
     return res.status(200).json({
         configured: arkeselConfigured(),
+        available,
+        customSenderAvailable: userHasFeature(req.user, "customSmsSender"),
         defaultSender: defaultPlatformSmsSender() || null,
         studio: formatSmsSenderFields(studio),
+        ...(available
+            ? {}
+            : {
+                  upgrade: {
+                      feature: "smsNotifications",
+                      message: "SMS notifications are included on Basic, Pro, and Premium.",
+                  },
+              }),
     })
 }
 
 export const sendTestSms = async (req, res) => {
     try {
+        if (!userHasFeature(req.user, "smsNotifications")) {
+            return sendFeatureDenied(res, "smsNotifications", { user: req.user })
+        }
+
         const phone = req.body?.phone ?? req.body?.to ?? req.user.studio?.phone
         const message =
             req.body?.message?.trim() ||
