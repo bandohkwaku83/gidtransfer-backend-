@@ -4031,7 +4031,7 @@
                   "key": "cover",
                   "type": "file",
                   "src": [],
-                  "description": "PNG/JPG/WebP, max 5MB"
+                  "description": "PNG/JPG/WebP, max 10MB"
                 }
               ]
             },
@@ -4163,7 +4163,7 @@
                   "key": "cover",
                   "type": "file",
                   "src": [],
-                  "description": "Replace cover — PNG/JPG/WebP, max 5MB"
+                  "description": "Replace cover — PNG/JPG/WebP, max 10MB"
                 }
               ]
             },
@@ -4701,7 +4701,7 @@
                   "mode": "raw",
                   "raw": "{\n  \"photoIds\": [\"{{photoId}}\"]\n}"
                 },
-                "description": "Dashboard drag-reorder. Send the **full** gallery-wide ordered list of active upload ids (not just the visible set). Backend sets `sortOrder` = array index. Client share URL returns `photos[]` in this order.",
+                "description": "Dashboard drag-reorder. Send ordered active upload ids (`photoIds`). A subset is OK (current page or photos-only): those ids are reordered in their existing slots; omitted ids (later pages, videos, etc.) stay in place. A full list still works. Client share URL returns `photos[]` in this order.",
                 "url": "{{baseUrl}}/api/galleries/{{galleryId}}/uploads/reorder"
               },
               "response": []
@@ -5052,7 +5052,7 @@
                   "mode": "raw",
                   "raw": "{\n  \"finalIds\": [\"{{finalId}}\"]\n}"
                 },
-                "description": "Dashboard drag-reorder. Send the **full** gallery-wide ordered list of active final ids. Backend sets `sortOrder` = array index. Client share URL returns `finals[]` in this order.",
+                "description": "Dashboard drag-reorder. Send ordered active final ids (`finalIds`). A subset is OK (current page): those ids are reordered in their existing slots; omitted ids stay in place. A full list still works. Client share URL returns `finals[]` in this order.",
                 "url": "{{baseUrl}}/api/galleries/{{galleryId}}/finals/reorder"
               },
               "response": []

@@ -172,6 +172,7 @@ async function persistGalleryPhotoWithDerivatives({
         replace.sizeBytes = sizeBytes
         replace.isVideo = saved.isVideo
         replace.thumbStoredFilename = null
+        replace.previewStoredFilename = null
         replace.previewWmStoredFilename = null
         replace.posterStoredFilename = null
         replace.dashManifestStoredFilename = null
@@ -940,6 +941,7 @@ export const reorderGalleryUploads = async (req, res) => {
         }
 
         await persistGalleryMediaReorder(GalleryPhoto, gallery._id, photoIds)
+        scheduleGalleryPhotosReindex(gallery._id)
 
         return res.status(200).json({ message: "Order saved" })
     } catch (error) {

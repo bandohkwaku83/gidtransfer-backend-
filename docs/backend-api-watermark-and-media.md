@@ -12,13 +12,14 @@ This document describes how **watermarked previews**, **`displayUrl`**, and rela
 | **`watermarkPreviewEnabled`** | `Gallery` | Per-gallery override. Toggle via `PATCH /api/galleries/:id/upload-settings`. |
 | **`WATERMARK_PREVIEW_TEXT`** | Server env | Optional default text composited onto preview images. Falls back to the studio **company name**, then `"Preview"`. |
 
-Raw originals remain unmodified in storage (direct S3 PUT or local write). When preview watermarking is enabled, the upload pipeline writes companion files beside the original:
+Raw originals remain unmodified in storage (direct S3 PUT or local write). The upload pipeline writes smaller companion files beside the original for fast grid / lightbox delivery (CloudFront when `CLOUDFRONT_URL` is set):
 
 | File | Pattern | Purpose |
 |------|---------|---------|
-| Original | `{uuid}.jpg` | Full-quality master (`url` only — do not use for grids) |
+| Original | `{uuid}.jpg` | Full-quality master (`url` only — downloads; do not use for grids) |
 | Thumbnail | `{uuid}-thumb.jpg` | Default on (`GALLERY_THUMB_MAX_PX`, default **800**) — progressive JPEG used by `thumbUrl` / `gridUrl` |
-| Watermarked preview | `{uuid}-preview-wm.jpg` | Client full-screen preview (`displayUrl` / `viewUrl`) — progressive JPEG |
+| Preview | `{uuid}-preview.webp` | Default on (`GALLERY_PREVIEW_MAX_PX`, default **2560**) — WebP lightbox (`previewUrl` / `viewUrl`) |
+| Watermarked preview | `{uuid}-preview-wm.webp` | Client full-screen when watermarking is on (`displayUrl` / `viewUrl`) |
 
 ---
 
@@ -67,7 +68,8 @@ Legacy mixed routes (`POST …/uploads`, `…/presign`, `…/complete`) still ac
   "originalFilename": "IMG_001.jpg",
   "url": "/uploads/gallery-photos/{galleryId}/{uuid}.jpg",
   "thumbUrl": "/uploads/gallery-photos/{galleryId}/{uuid}-thumb.jpg",
-  "displayUrl": "/uploads/gallery-photos/{galleryId}/{uuid}-preview-wm.jpg",
+  "previewUrl": "/uploads/gallery-photos/{galleryId}/{uuid}-preview.webp",
+  "displayUrl": "/uploads/gallery-photos/{galleryId}/{uuid}-preview-wm.webp",
   "mimeType": "image/jpeg",
   "isVideo": false
 }
@@ -94,12 +96,13 @@ When preview watermarking is enabled and derivatives exist:
 ```json
 {
   "thumbUrl": "http://…/uploads/gallery-photos/…/uuid-thumb.jpg",
-  "displayUrl": "http://…/uploads/gallery-photos/…/uuid-preview-wm.jpg",
+  "previewUrl": "http://…/uploads/gallery-photos/…/uuid-preview.webp",
+  "displayUrl": "http://…/uploads/gallery-photos/…/uuid-preview-wm.webp",
   "url": "http://…/uploads/gallery-photos/…/uuid.jpg"
 }
 ```
 
-The client gallery prefers `displayUrl` for full-screen preview. When **`displayUrl` differs from `thumbUrl`**, the app uses the server watermarked file and **skips** the CSS text overlay.
+The client gallery prefers `displayUrl` for full-screen preview when watermarking is enabled. Otherwise it uses `previewUrl` (`viewUrl` already picks this). When **`displayUrl` differs from `thumbUrl`**, the app uses the server watermarked file and **skips** the CSS text overlay.
 
 When watermarking is enabled but no `displayUrl` exists yet (legacy uploads), the client may show a CSS overlay fallback in the same browser session.
 
@@ -107,7 +110,7 @@ When watermarking is enabled but no `displayUrl` exists yet (legacy uploads), th
 
 ## Delete raw photo
 
-`DELETE /api/galleries/:id/uploads/:photoId` removes the original and any `{uuid}-thumb.jpg` / `{uuid}-preview-wm.jpg` companions.
+`DELETE /api/galleries/:id/uploads/:photoId` removes the original and any `{uuid}-thumb.jpg` / `{uuid}-preview.webp` / `{uuid}-preview-wm.webp` companions.
 
 ---
 
@@ -118,5 +121,5 @@ When watermarking is enabled but no `displayUrl` exists yet (legacy uploads), th
 | Studio default toggle | `PATCH /api/settings/gallery-defaults/watermark-preview` |
 | Per-gallery toggle | `PATCH /api/galleries/:id/upload-settings` |
 | Preview generation | `POST /api/galleries/:id/uploads` with `applyPreviewWatermark=true` |
-| Client-safe URLs | Public GET — `thumbUrl`, `displayUrl`, `url` on photo rows |
+| Client-safe URLs | Public GET — `thumbUrl`, `previewUrl`, `displayUrl`, `viewUrl` on photo rows (`url` is the original, for download only) |
 | Watermark text | `WATERMARK_PREVIEW_TEXT` env or studio `companyName` |

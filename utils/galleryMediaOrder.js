@@ -26,10 +26,6 @@ export const validateGalleryReorderIds = (orderedIds, activeDocs, label) => {
     }
 
     const activeIds = new Set(activeDocs.map((doc) => String(doc._id)))
-    if (orderedIds.length !== activeIds.size) {
-        return `Expected ${activeIds.size} ids in ${label}, received ${orderedIds.length}`
-    }
-
     for (const id of orderedIds) {
         if (!activeIds.has(String(id))) {
             return `Unknown or inactive id in ${label}: ${id}`
@@ -37,6 +33,25 @@ export const validateGalleryReorderIds = (orderedIds, activeDocs, label) => {
     }
 
     return null
+}
+
+/**
+ * Apply a (possibly partial) reorder onto the current id list.
+ * Payload ids keep the given order and occupy the same slots they currently
+ * hold; ids omitted from the payload stay in place.
+ */
+export const mergeGalleryReorder = (currentIds, orderedIds) => {
+    const incoming = orderedIds.map(String)
+    const incomingSet = new Set(incoming)
+    let next = 0
+    return currentIds.map((id) => {
+        if (incomingSet.has(String(id))) {
+            const replacement = incoming[next]
+            next += 1
+            return replacement
+        }
+        return String(id)
+    })
 }
 
 export async function getNextGalleryMediaSortOrder(Model, galleryId) {
@@ -55,7 +70,20 @@ export async function getNextGalleryMediaSortOrder(Model, galleryId) {
 }
 
 export async function persistGalleryMediaReorder(Model, galleryId, orderedIds) {
-    const ops = orderedIds.map((id, index) => ({
+    const current = await Model.find({
+        gallery: galleryId,
+        deletedAt: null,
+    })
+        .select("_id")
+        .sort(GALLERY_MEDIA_SORT)
+        .lean()
+
+    const merged = mergeGalleryReorder(
+        current.map((doc) => String(doc._id)),
+        orderedIds
+    )
+
+    const ops = merged.map((id, index) => ({
         updateOne: {
             filter: {
                 _id: id,

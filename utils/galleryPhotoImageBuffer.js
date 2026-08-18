@@ -28,7 +28,9 @@ const readStoredFileBuffer = async (galleryId, storedFilename) => {
 export const readGalleryPhotoAnalysisBuffer = async (photo) => {
     const galleryId = String(photo.gallery)
     const filename =
-        photo.thumbStoredFilename?.trim() || photo.storedFilename?.trim()
+        photo.previewStoredFilename?.trim() ||
+        photo.thumbStoredFilename?.trim() ||
+        photo.storedFilename?.trim()
     if (!filename) return null
 
     const raw = await readStoredFileBuffer(galleryId, filename)

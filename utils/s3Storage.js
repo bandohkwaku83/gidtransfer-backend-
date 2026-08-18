@@ -58,12 +58,25 @@ export const getS3Client = () => {
 
 export const s3Bucket = () => process.env.S3_BUCKET?.trim() ?? ""
 
+/** UUID filenames are immutable — CloudFront / browsers can cache for a year. */
+export const S3_IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable"
+
+/**
+ * Public CDN origin for gallery media (CloudFront preferred, S3_PUBLIC_URL as alias).
+ * Example: https://d111111abcdef8.cloudfront.net
+ */
+export const cdnPublicBase = () =>
+    (
+        process.env.CLOUDFRONT_URL?.trim() ||
+        process.env.S3_PUBLIC_URL?.trim() ||
+        ""
+    ).replace(/\/$/, "")
+
 /**
  * True when gallery media should use direct HTTPS URLs (CloudFront / custom CDN).
  * Without this, clients should load files via GET /uploads/… on the API (s3UploadsMiddleware).
  */
-export const s3PublicReadsViaDirectUrl = () =>
-    Boolean(process.env.S3_PUBLIC_URL?.trim())
+export const s3PublicReadsViaDirectUrl = () => Boolean(cdnPublicBase())
 
 /** Build a stable S3 object key from path segments. */
 export const objectKey = (...parts) =>
@@ -75,7 +88,7 @@ export const objectKey = (...parts) =>
 
 /** Public URL for an object (CloudFront or virtual-hosted S3). */
 export const publicObjectUrl = (key) => {
-    const customBase = process.env.S3_PUBLIC_URL?.trim()?.replace(/\/$/, "")
+    const customBase = cdnPublicBase()
     if (customBase) return `${customBase}/${key}`
     const bucket = s3Bucket()
     const region = awsRegion()
@@ -112,7 +125,12 @@ export const createPresignedPutUrl = async (
     }
 }
 
-export const uploadBuffer = async (key, buffer, contentType) => {
+export const uploadBuffer = async (
+    key,
+    buffer,
+    contentType,
+    { cacheControl = S3_IMMUTABLE_CACHE_CONTROL } = {}
+) => {
     const client = getS3Client()
     if (!client) throw new Error("S3 is not configured")
     await client.send(
@@ -121,6 +139,7 @@ export const uploadBuffer = async (key, buffer, contentType) => {
             Key: key,
             Body: buffer,
             ContentType: contentType,
+            CacheControl: cacheControl,
         })
     )
     return publicObjectUrl(key)

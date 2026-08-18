@@ -1,6 +1,6 @@
 import GalleryPhoto from "../models/GalleryPhoto.js"
 import { isGalleryImageMime } from "./galleryMediaTypes.js"
-import { generateGalleryPhotoDerivatives, galleryThumbMaxPx } from "./previewWatermark.js"
+import { generateGalleryPhotoDerivatives, galleryThumbMaxPx, galleryPreviewMaxPx } from "./previewWatermark.js"
 
 const MAX_CONCURRENT = Math.max(
     1,
@@ -10,11 +10,12 @@ const MAX_CONCURRENT = Math.max(
 const queue = []
 let active = 0
 
-/** True when thumbnails / watermarked previews are not pending for this photo. */
+/** True when thumbnails / previews are not pending for this photo. */
 export const photoDerivativesReady = (photo) => {
     if (photo?.isVideo === true) return true
     if (!isGalleryImageMime(photo?.mimeType)) return true
     if (galleryThumbMaxPx() > 0 && !photo?.thumbStoredFilename) return false
+    if (galleryPreviewMaxPx() > 0 && !photo?.previewStoredFilename) return false
     return true
 }
 
@@ -42,6 +43,7 @@ const processJob = async (job) => {
             {
                 $set: {
                     thumbStoredFilename: derivatives.thumbStoredFilename,
+                    previewStoredFilename: derivatives.previewStoredFilename,
                     previewWmStoredFilename: derivatives.previewWmStoredFilename,
                 },
             }

@@ -2,10 +2,10 @@ import fs from "fs"
 import path from "path"
 import { fileURLToPath } from "url"
 
-export const MAX_GALLERY_DEFAULT_COVER_BYTES = 5_242_880
+export const MAX_GALLERY_DEFAULT_COVER_BYTES = 10_485_760 // 10 MiB
 
 export const galleryDefaultCoverSizeErrorMessage = () =>
-    "Default cover must be 5MB or smaller"
+    "Default cover must be 10MB or smaller"
 
 export const GALLERY_DEFAULT_COVERS_DIR = path.join(
     path.dirname(fileURLToPath(import.meta.url)),

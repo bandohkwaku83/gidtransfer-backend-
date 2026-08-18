@@ -4,33 +4,37 @@ Backend media delivery for faster perceived loading and adaptive video playback.
 
 ## Images — Progressive JPEG
 
-Grid thumbnails and JPEG watermarked previews are encoded as **progressive JPEG** (mozjpeg). Browsers paint a rough full-frame early, then refine — faster perceived load than camera originals (baseline JPEG), which paint **top-to-bottom**.
+Grid thumbnails are **progressive JPEG** (mozjpeg). Lightbox / client previews are **WebP** at 2560px (`GALLERY_PREVIEW_MAX_PX`). Originals stay in S3 untouched.
+
+Set `CLOUDFRONT_URL` (or `S3_PUBLIC_URL`) so browsers load thumbs and previews from CloudFront instead of proxying through the API.
 
 | Env | Default | Purpose |
 |-----|---------|---------|
 | `GALLERY_THUMB_MAX_PX` | `800` | Enable thumbs (set `0` to disable); min 320 when on |
 | `GALLERY_THUMB_JPEG_QUALITY` | `82` | Thumb quality (faster encode + smaller files) |
-| `GALLERY_PREVIEW_JPEG_QUALITY` | `90` | Watermarked preview JPEG quality |
+| `GALLERY_PREVIEW_MAX_PX` | `2560` | Lightbox preview (set `0` to disable); min 1600 when on |
+| `GALLERY_PREVIEW_WEBP_QUALITY` | `90` | Preview WebP quality |
+| `CLOUDFRONT_URL` | unset | CDN origin in front of S3 (`https://dxxxx.cloudfront.net`) |
 
-Thumbs are always `*-thumb.jpg` (progressive). Watermarked previews are always `*-preview-wm.jpg` (progressive), even when the original is PNG/WebP.
+Thumbs are always `*-thumb.jpg` (progressive). Previews are always `*-preview.webp`. Watermarked previews are `*-preview-wm.webp` (2560px), even when the original is PNG/JPEG.
 
-Original masters are **not** re-encoded — do **not** use `url` for gallery grids.
+Original masters are **not** re-encoded — do **not** use `url` for gallery grids or lightbox.
 
 ### Which URL to use
 
 | UI surface | Field | Notes |
 |------------|-------|-------|
-| Grid / masonry tiles | **`gridUrl`** | Progressive thumb when ready; poster for video; falls back to `url` until `derivativesReady` |
+| Grid / masonry tiles | **`gridUrl`** | Progressive thumb when ready; poster for video; falls back to `previewUrl` then `url` until `derivativesReady` |
 | Same as grid (explicit) | `thumbUrl` | Present once the thumb exists |
-| Lightbox / full view | `viewUrl` or `displayUrl` | Watermarked progressive preview when enabled; else master |
-| Download / master | `url` | Full original — slow top-to-bottom paint; never for grids |
+| Lightbox / full view | **`viewUrl`** or `previewUrl` | 2560px WebP when ready; watermarked `displayUrl` when that setting is on |
+| Download / master | `url` | Full original — never for grids or previews |
 
 ```js
 // Grid tile
-img.src = photo.gridUrl || photo.thumbUrl || photo.url
+img.src = photo.gridUrl || photo.thumbUrl || photo.previewUrl || photo.url
 
 // Lightbox
-img.src = photo.viewUrl || photo.displayUrl || photo.url
+img.src = photo.viewUrl || photo.previewUrl || photo.displayUrl || photo.url
 ```
 
 Until `derivativesReady === true`, `gridUrl` may still equal `url` — show a neutral placeholder / skeleton so the UI does not flash a giant baseline JPEG.
@@ -95,4 +99,4 @@ Poll gallery/list endpoints — packaging is async and does not block upload `20
 
 ### CORS / CDN
 
-Segment requests go to the same origin as `dashUrl` (`/uploads/…` or `S3_PUBLIC_URL`). Prefer a CDN (`S3_PUBLIC_URL`) for segment traffic. The API proxy sets `Access-Control-Allow-Origin: *` on `.mpd` / `.m4s` when serving from S3 via `/uploads`.
+Segment requests go to the same origin as `dashUrl` (`/uploads/…` or `CLOUDFRONT_URL`). Prefer CloudFront (`CLOUDFRONT_URL`) for image and segment traffic. The API proxy sets `Access-Control-Allow-Origin: *` on `.mpd` / `.m4s` when serving from S3 via `/uploads`.

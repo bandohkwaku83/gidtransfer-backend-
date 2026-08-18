@@ -103,6 +103,9 @@ export const deleteGalleryPhotoAssets = (galleryId, photo) => {
     if (photo.thumbStoredFilename) {
         deleteGalleryPhotoFile(galleryId, photo.thumbStoredFilename)
     }
+    if (photo.previewStoredFilename) {
+        deleteGalleryPhotoFile(galleryId, photo.previewStoredFilename)
+    }
     if (photo.previewWmStoredFilename) {
         deleteGalleryPhotoFile(galleryId, photo.previewWmStoredFilename)
     }

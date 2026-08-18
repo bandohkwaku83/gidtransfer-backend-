@@ -58,7 +58,7 @@ export async function permanentlyDeleteGallery(galleryDoc) {
     const [photos, finals] = await Promise.all([
         GalleryPhoto.find({ gallery: galleryId })
             .select(
-                "storedFilename thumbStoredFilename previewWmStoredFilename posterStoredFilename dashManifestStoredFilename isVideo"
+                "storedFilename thumbStoredFilename previewStoredFilename previewWmStoredFilename posterStoredFilename dashManifestStoredFilename isVideo"
             )
             .exec(),
         GalleryFinal.find({ gallery: galleryId })

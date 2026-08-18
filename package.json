@@ -6,14 +6,17 @@
   "author": "Kwaku",
   "type": "module",
   "main": "index.js",
-    "scripts": {
-        "start": "nodemon index.js",
-        "dev": "nodemon index.js",
-        "create-admin": "node scripts/createAdmin.js",
-        "create-paystack-plans": "node scripts/createPaystackPlans.js",
-        "reindex-opensearch": "node scripts/reindexOpensearch.js"
-    },
+  "scripts": {
+    "start": "nodemon index.js",
+    "dev": "nodemon index.js",
+    "create-admin": "node scripts/createAdmin.js",
+    "create-paystack-plans": "node scripts/createPaystackPlans.js",
+    "reindex-opensearch": "node scripts/reindexOpensearch.js",
+    "ensure-cloudfront": "node scripts/ensureCloudFront.js",
+    "regenerate-derivatives": "node scripts/regenerateGalleryDerivatives.js"
+  },
   "dependencies": {
+    "@aws-sdk/client-cloudfront": "^3.1111.0",
     "@aws-sdk/client-s3": "^3.1076.0",
     "@aws-sdk/s3-request-presigner": "^3.1076.0",
     "@opensearch-project/opensearch": "^3.6.0",

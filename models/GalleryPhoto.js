@@ -35,7 +35,12 @@ const galleryPhotoSchema = new mongoose.Schema(
             type: String,
             default: null,
         },
-        /** Watermarked client preview (`*-preview-wm.jpg`). */
+        /** High-quality WebP preview for gallery / lightbox (`*-preview.webp`). */
+        previewStoredFilename: {
+            type: String,
+            default: null,
+        },
+        /** Watermarked client preview (`*-preview-wm.webp`). */
         previewWmStoredFilename: {
             type: String,
             default: null,

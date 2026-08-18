@@ -51,7 +51,7 @@ export const createS3UploadsMiddleware = ({ uploadsDir }) => {
                 mimeForMediaFilename(relativePath) ||
                 "application/octet-stream"
             res.setHeader("Content-Type", contentType)
-            res.setHeader("Cache-Control", "public, max-age=86400")
+            res.setHeader("Cache-Control", "public, max-age=31536000, immutable")
             // DASH players need CORS-friendly segment fetches from the API origin.
             if (relativePath.endsWith(".mpd") || relativePath.endsWith(".m4s")) {
                 res.setHeader("Access-Control-Allow-Origin", "*")

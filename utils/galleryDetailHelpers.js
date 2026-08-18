@@ -213,6 +213,9 @@ export const formatGalleryPhotoResponse = (
     const thumbRelative = p.thumbStoredFilename
         ? galleryPhotoPublicUrl(galleryId, p.thumbStoredFilename)
         : undefined
+    const previewRelative = p.previewStoredFilename
+        ? galleryPhotoPublicUrl(galleryId, p.previewStoredFilename)
+        : undefined
     const displayRelative = p.previewWmStoredFilename
         ? galleryPhotoPublicUrl(galleryId, p.previewWmStoredFilename)
         : undefined
@@ -224,6 +227,7 @@ export const formatGalleryPhotoResponse = (
         : undefined
 
     const thumbUrl = resolve(thumbRelative)
+    const previewUrl = previewRelative ? resolve(previewRelative) : undefined
     const displayUrl = displayRelative ? resolve(displayRelative) : undefined
     const posterUrl = posterRelative ? resolve(posterRelative) : undefined
     const dashUrl = dashRelative ? resolve(dashRelative) : undefined
@@ -253,21 +257,24 @@ export const formatGalleryPhotoResponse = (
     }
 
     if (thumbUrl) response.thumbUrl = thumbUrl
+    if (previewUrl) response.previewUrl = previewUrl
     if (displayUrl) response.displayUrl = displayUrl
     if (posterUrl) response.posterUrl = posterUrl
     if (dashUrl) response.dashUrl = dashUrl
 
     // Grid tiles must never use full-resolution camera originals — those are
     // usually baseline JPEG and paint top-to-bottom while downloading.
-    // Prefer progressive thumb (images) or poster (videos); fall back to url
-    // only until derivatives finish.
+    // Prefer progressive thumb (images) or poster (videos); fall back to the
+    // 2560px WebP preview, then original only until derivatives finish.
     if (p.isVideo === true) {
         response.gridUrl = posterUrl || url
     } else {
-        response.gridUrl = thumbUrl || url
+        response.gridUrl = thumbUrl || previewUrl || url
     }
     response.viewUrl =
-        watermarkPreviewEnabled && displayUrl ? displayUrl : url
+        watermarkPreviewEnabled && displayUrl
+            ? displayUrl
+            : previewUrl || url
 
     if (includeAi) {
         const ai = formatPublicGalleryPhotoAiResponse(doc)
@@ -289,6 +296,7 @@ export const formatGalleryPhotoGridResponse = (
         originalFilename: full.originalFilename,
         url: full.url,
         thumbUrl: full.thumbUrl,
+        previewUrl: full.previewUrl,
         posterUrl: full.posterUrl,
         dashUrl: full.dashUrl,
         gridUrl: full.gridUrl,

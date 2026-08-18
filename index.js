@@ -38,13 +38,13 @@ import { openAiConfigured } from "./utils/galleryAiDescription.js"
 import { arkeselConfigured } from "./services/arkeselSms.js"
 import { resendConfigured } from "./services/resendEmail.js"
 import { paystackConfigured } from "./services/paystack.js"
-import { s3Configured, s3PublicReadsViaDirectUrl } from "./utils/s3Storage.js"
+import { s3Configured, s3PublicReadsViaDirectUrl, cdnPublicBase } from "./utils/s3Storage.js"
 import { createS3UploadsMiddleware } from "./utils/s3UploadsMiddleware.js"
 import { startBookingReminderScheduler } from "./jobs/bookingReminderJob.js"
 import { startSubscriptionRenewalReminderScheduler } from "./jobs/subscriptionRenewalReminderJob.js"
 import { ffmpegAvailable, resolveFfmpegPath } from "./utils/ffmpeg.js"
 import { galleryVideoDashEnabled } from "./utils/galleryVideoDash.js"
-import { galleryThumbMaxPx } from "./utils/previewWatermark.js"
+import { galleryThumbMaxPx, galleryPreviewMaxPx } from "./utils/previewWatermark.js"
 import { initOpensearch, opensearchEnabled } from "./utils/opensearch.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -103,11 +103,11 @@ if (s3Configured()) {
     const bucket = process.env.S3_BUCKET?.trim()
     if (s3PublicReadsViaDirectUrl()) {
         console.log(
-            `Object storage (S3): enabled — bucket ${bucket}, public reads via ${process.env.S3_PUBLIC_URL?.trim()}`
+            `Object storage (S3): enabled — bucket ${bucket}, public reads via CloudFront ${cdnPublicBase()}`
         )
     } else {
         console.log(
-            `Object storage (S3): enabled — bucket ${bucket}, gallery media served via GET /uploads/… (set S3_PUBLIC_URL for a CDN)`
+            `Object storage (S3): enabled — bucket ${bucket}, gallery media served via GET /uploads/… (set CLOUDFRONT_URL for a CDN)`
         )
     }
 } else {
@@ -118,13 +118,16 @@ if (s3Configured()) {
 
 {
     const thumbPx = galleryThumbMaxPx()
-    if (thumbPx > 0) {
+    const previewPx = galleryPreviewMaxPx()
+    if (thumbPx > 0 || previewPx > 0) {
         console.log(
-            `Gallery images: progressive JPEG thumbs enabled (max ${thumbPx}px)`
+            `Gallery images: Sharp derivatives — thumbs ${
+                thumbPx > 0 ? `${thumbPx}px JPEG` : "off"
+            }, previews ${previewPx > 0 ? `${previewPx}px WebP` : "off"} (originals unchanged)`
         )
     } else {
         console.log(
-            "Gallery images: progressive JPEG thumbs disabled (GALLERY_THUMB_MAX_PX=0)"
+            "Gallery images: Sharp derivatives disabled (GALLERY_THUMB_MAX_PX=0, GALLERY_PREVIEW_MAX_PX=0)"
         )
     }
 }
@@ -449,7 +452,7 @@ app.get("/api", (_req, res) => {
                 uploads: {
                     list: "GET /api/galleries/:id/uploads?mediaType=photo|video&q=&scene=&tag=&suggested=&blurry=&eyesOpen=&minQuality=&page=&limit= (search uses OpenSearch when enabled)",
                     reorder:
-                        "PATCH /api/galleries/:id/uploads/reorder (body: photoIds[])",
+                        "PATCH /api/galleries/:id/uploads/reorder (body: photoIds[] — full list or subset of the page/kind being reordered)",
                     photosPresign:
                         "POST /api/galleries/:id/uploads/photos/presign (JSON: files[] — images only)",
                     photosComplete:
@@ -477,7 +480,7 @@ app.get("/api", (_req, res) => {
                     list: "GET /api/galleries/:id/finals (ordered by sortOrder)",
                     flagged: "GET /api/galleries/:id/finals/flagged",
                     reorder:
-                        "PATCH /api/galleries/:id/finals/reorder (body: finalIds[])",
+                        "PATCH /api/galleries/:id/finals/reorder (body: finalIds[] — full list or subset)",
                     presign:
                         "POST /api/galleries/:id/finals/presign (JSON: files[] — presigned S3 PUT URLs)",
                     complete:

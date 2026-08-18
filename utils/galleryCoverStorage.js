@@ -2,7 +2,9 @@ import fs from "fs"
 import path from "path"
 import { fileURLToPath } from "url"
 
-export const MAX_GALLERY_COVER_BYTES = 5_242_880 // 5 MiB
+export const MAX_GALLERY_COVER_BYTES = 10_485_760 // 10 MiB
+
+export const galleryCoverSizeErrorMessage = () => "Cover must be 10MB or smaller"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -31,7 +33,7 @@ export const validateGalleryCoverFile = (file) => {
         return "Cover must be PNG, JPG, or WebP"
     }
     if (file.size > MAX_GALLERY_COVER_BYTES) {
-        return "Cover must be 5MB or smaller"
+        return galleryCoverSizeErrorMessage()
     }
     return null
 }

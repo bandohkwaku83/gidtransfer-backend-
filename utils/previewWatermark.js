@@ -14,18 +14,31 @@ import {
     deleteObject,
 } from "./s3Storage.js"
 
+const parsePositivePx = (raw, fallback, min) => {
+    if (raw === undefined || raw === "") return fallback
+    const n = Number(raw)
+    if (!Number.isFinite(n) || n <= 0) return 0
+    return Math.max(min, Math.floor(n))
+}
+
 const parseThumbMaxPx = () => {
     const raw = process.env.GALLERY_THUMB_MAX_PX?.trim()
     // Default on (800) for progressive JPEG grid delivery; set 0 to disable.
     // 800 keeps retina tiles sharp without shipping camera-sized masters in the grid.
-    if (raw === undefined || raw === "") return 800
-    const n = Number(raw)
-    if (!Number.isFinite(n) || n <= 0) return 0
-    return Math.max(320, Math.floor(n))
+    return parsePositivePx(raw, 800, 320)
+}
+
+const parsePreviewMaxPx = () => {
+    const raw = process.env.GALLERY_PREVIEW_MAX_PX?.trim()
+    // Default 2560px so lightbox stays sharp on retina (2x of a ~1280 CSS-px stage).
+    return parsePositivePx(raw, 2560, 1600)
 }
 
 /** Optional grid thumbnails — default 800px progressive JPEG; set GALLERY_THUMB_MAX_PX=0 to disable. Originals are never resized. */
 export const galleryThumbMaxPx = () => parseThumbMaxPx()
+
+/** Lightbox / client preview — default 2560px WebP; set GALLERY_PREVIEW_MAX_PX=0 to disable. */
+export const galleryPreviewMaxPx = () => parsePreviewMaxPx()
 
 const escapeXml = (value) =>
     String(value ?? "")
@@ -67,9 +80,9 @@ const thumbJpegQuality = () => {
     return 82
 }
 
-/** Progressive JPEG for full-res watermarked previews. */
-const previewJpegQuality = () => {
-    const n = Number(process.env.GALLERY_PREVIEW_JPEG_QUALITY)
+/** WebP quality for lightbox previews (and watermarked previews). */
+const previewWebpQuality = () => {
+    const n = Number(process.env.GALLERY_PREVIEW_WEBP_QUALITY)
     if (Number.isFinite(n) && n >= 40 && n <= 100) return Math.floor(n)
     return 90
 }
@@ -80,7 +93,9 @@ const derivativeNames = (storedFilename) => {
     return {
         // Always progressive JPEG — avoids baseline top-to-bottom paint on grid/lightbox.
         thumbStoredFilename: `${base}-thumb.jpg`,
-        previewWmStoredFilename: `${base}-preview-wm.jpg`,
+        previewStoredFilename: `${base}-preview.webp`,
+        previewWmStoredFilename: `${base}-preview-wm.webp`,
+        legacyPreviewWmJpeg: `${base}-preview-wm.jpg`,
     }
 }
 
@@ -90,6 +105,24 @@ const applyProgressiveJpeg = (pipeline, quality) =>
         mozjpeg: true,
         progressive: true,
         chromaSubsampling: "4:2:0",
+    })
+
+const applyPreviewWebp = (pipeline, quality) =>
+    pipeline.webp({
+        quality,
+        effort: 5,
+        preset: "photo",
+        smartSubsample: false,
+    })
+
+const resizeInside = (pipeline, maxPx) =>
+    pipeline.resize({
+        width: maxPx,
+        height: maxPx,
+        fit: "inside",
+        withoutEnlargement: true,
+        kernel: "lanczos3",
+        fastShrinkOnLoad: false,
     })
 
 const galleryPhotoPath = (galleryId, storedFilename) =>
@@ -129,8 +162,8 @@ const removeDerivative = async (galleryId, storedFilename) => {
 }
 
 /**
- * Generate thumbnail and optional watermarked preview beside the stored original.
- * Returns derivative filenames; skips work for non-image media.
+ * Generate thumbnail + high-quality WebP preview (and optional watermarked preview)
+ * beside the stored original. Originals are never resized or overwritten.
  */
 export async function generateGalleryPhotoDerivatives({
     galleryId,
@@ -139,38 +172,42 @@ export async function generateGalleryPhotoDerivatives({
     watermarkText,
     applyWatermark = false,
 }) {
+    const empty = {
+        thumbStoredFilename: null,
+        previewStoredFilename: null,
+        previewWmStoredFilename: null,
+    }
+
     if (!isGalleryImageMime(mimeType)) {
-        return { thumbStoredFilename: null, previewWmStoredFilename: null }
+        return empty
     }
 
     const localPath = galleryPhotoStoragePath(galleryId, storedFilename)
     if (!s3Configured() && (!localPath || !fs.existsSync(localPath))) {
-        return { thumbStoredFilename: null, previewWmStoredFilename: null }
+        return empty
     }
 
     const sourceBuffer = await readSourceBuffer(galleryId, storedFilename)
     if (!sourceBuffer) {
-        return { thumbStoredFilename: null, previewWmStoredFilename: null }
+        return empty
     }
 
-    const { thumbStoredFilename, previewWmStoredFilename } =
-        derivativeNames(storedFilename)
+    const {
+        thumbStoredFilename,
+        previewStoredFilename,
+        previewWmStoredFilename,
+        legacyPreviewWmJpeg,
+    } = derivativeNames(storedFilename)
     const thumbMaxPx = parseThumbMaxPx()
-
-    const meta = await sharp(sourceBuffer, { failOn: "none" }).rotate().metadata()
+    const previewMaxPx = parsePreviewMaxPx()
 
     let thumbResultFilename = null
     if (thumbMaxPx > 0) {
-        // Progressive JPEG — paints early while the rest loads (faster perceived load).
         const thumbBuffer = await applyProgressiveJpeg(
-            sharp(sourceBuffer, { failOn: "none" })
-                .rotate()
-                .resize({
-                    width: thumbMaxPx,
-                    height: thumbMaxPx,
-                    fit: "inside",
-                    withoutEnlargement: true,
-                }),
+            resizeInside(
+                sharp(sourceBuffer, { failOn: "none" }).rotate(),
+                thumbMaxPx
+            ),
             thumbJpegQuality()
         ).toBuffer()
 
@@ -185,36 +222,63 @@ export async function generateGalleryPhotoDerivatives({
         await removeDerivative(galleryId, thumbStoredFilename)
     }
 
+    let previewResultFilename = null
+    if (previewMaxPx > 0) {
+        const previewBuffer = await applyPreviewWebp(
+            resizeInside(
+                sharp(sourceBuffer, { failOn: "none" }).rotate(),
+                previewMaxPx
+            ),
+            previewWebpQuality()
+        ).toBuffer()
+
+        await writeDerivative(
+            galleryId,
+            previewStoredFilename,
+            previewBuffer,
+            "image/webp"
+        )
+        previewResultFilename = previewStoredFilename
+    } else {
+        await removeDerivative(galleryId, previewStoredFilename)
+    }
+
+    let previewWmResultFilename = null
     if (applyWatermark) {
-        const { data, info } = await sharp(sourceBuffer, { failOn: "none" })
-            .rotate()
-            .toBuffer({ resolveWithObject: true })
+        const wmMaxPx = previewMaxPx > 0 ? previewMaxPx : 2560
+        const { data, info } = await resizeInside(
+            sharp(sourceBuffer, { failOn: "none" }).rotate(),
+            wmMaxPx
+        ).toBuffer({ resolveWithObject: true })
+
         const overlay = tiledWatermarkSvg(
             watermarkText,
-            info.width ?? meta.width ?? 1,
-            info.height ?? meta.height ?? 1
+            info.width ?? 1,
+            info.height ?? 1
         )
 
-        // Always progressive JPEG (even when the master is PNG/WebP) so lightbox
-        // paint is full-frame early instead of top-to-bottom baseline decode.
-        const previewBuffer = await applyProgressiveJpeg(
+        const previewWmBuffer = await applyPreviewWebp(
             sharp(data).composite([{ input: overlay, blend: "over" }]),
-            previewJpegQuality()
+            previewWebpQuality()
         ).toBuffer()
 
         await writeDerivative(
             galleryId,
             previewWmStoredFilename,
-            previewBuffer,
-            "image/jpeg"
+            previewWmBuffer,
+            "image/webp"
         )
+        await removeDerivative(galleryId, legacyPreviewWmJpeg)
+        previewWmResultFilename = previewWmStoredFilename
     } else {
         await removeDerivative(galleryId, previewWmStoredFilename)
+        await removeDerivative(galleryId, legacyPreviewWmJpeg)
     }
 
     return {
         thumbStoredFilename: thumbResultFilename,
-        previewWmStoredFilename: applyWatermark ? previewWmStoredFilename : null,
+        previewStoredFilename: previewResultFilename,
+        previewWmStoredFilename: previewWmResultFilename,
     }
 }
 
@@ -223,9 +287,12 @@ export const deleteGalleryPhotoDerivatives = (galleryId, photo) => {
     const names = derivativeNames(photo.storedFilename ?? "")
     for (const filename of [
         photo.thumbStoredFilename,
+        photo.previewStoredFilename,
         photo.previewWmStoredFilename,
         names.thumbStoredFilename,
+        names.previewStoredFilename,
         names.previewWmStoredFilename,
+        names.legacyPreviewWmJpeg,
     ]) {
         if (!filename) continue
         if (s3Configured()) {
