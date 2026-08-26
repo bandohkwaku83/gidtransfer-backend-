@@ -10,11 +10,14 @@ import {
     emailVerificationOtpEmail,
     planUpgradedEmail,
     planRenewalReminderEmail,
+    collaborationInviteEmail,
+    studioTeamWelcomeEmail,
 } from "./emailTemplates.js"
 import {
     bookingDetailUrl,
     galleryDetailUrl,
     billingUrl,
+    collaborationInviteUrl,
 } from "./appLinks.js"
 import { photographerWantsEmail } from "./emailNotificationFields.js"
 import {
@@ -272,6 +275,56 @@ export const sendEmailVerificationOtp = async ({ email, code }) => {
 
     if (!resendConfigured()) {
         console.log(`[email-verification] ${email}: ${code}`)
+        return { dryRun: true }
+    }
+
+    return sendEmail({ to: email, ...payload, transactional: true })
+}
+
+export const sendCollaborationInviteEmail = async ({
+    email,
+    inviteeName,
+    ownerStudioName,
+    workspaceName,
+    role,
+    acceptUrl,
+}) => {
+    const payload = collaborationInviteEmail({
+        inviteeName,
+        ownerStudioName,
+        workspaceName,
+        role,
+        acceptUrl:
+            acceptUrl ||
+            collaborationInviteUrl(""),
+    })
+
+    if (!resendConfigured()) {
+        console.log(`[collaboration-invite] ${email}: ${payload.text}`)
+        return { dryRun: true }
+    }
+
+    return sendEmail({ to: email, ...payload, transactional: true })
+}
+
+export const sendStudioTeamWelcomeEmail = async ({
+    email,
+    displayName,
+    ownerStudioName,
+    role,
+    password,
+    loginUrl,
+}) => {
+    const payload = studioTeamWelcomeEmail({
+        displayName,
+        ownerStudioName,
+        role,
+        password,
+        loginUrl,
+    })
+
+    if (!resendConfigured()) {
+        console.log(`[studio-team-welcome] ${email}: ${payload.text}`)
         return { dryRun: true }
     }
 

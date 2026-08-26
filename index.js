@@ -22,6 +22,8 @@ import trashRoutes from "./routes/trashRoutes.js"
 import billingRoutes from "./routes/billingRoutes.js"
 import syncRoutes from "./routes/syncRoutes.js"
 import eventsRoutes from "./routes/eventsRoutes.js"
+import collaborationRoutes from "./routes/collaborationRoutes.js"
+import studioTeamRoutes from "./routes/studioTeamRoutes.js"
 import { paystackWebhook } from "./controllers/billingController.js"
 import Gallery from "./models/Gallery.js"
 import { initAccountIdCounter, migrateMissingAccountIds } from "./utils/accountId.js"
@@ -378,7 +380,7 @@ app.get("/api", (_req, res) => {
                     revoke: "DELETE /api/settings/api-tokens/:tokenId",
                 },
             },
-            dashboard: "GET /api/dashboard",
+            dashboard: "GET /api/dashboard (recentActivity, newClients, currentSelections, newGalleries, schedules + stats/storage)",
             sync: {
                 revision: "GET /api/sync/revision (lightweight cache check — ETag supported)",
                 changes: "GET /api/sync/changes?since=ISO8601 (incremental updates)",
@@ -500,6 +502,42 @@ app.get("/api", (_req, res) => {
                     "POST /api/galleries/:id/share-link (optional JSON: notifyClientViaSms, message)",
                 shareLinkRevoke: "DELETE /api/galleries/:id/share-link",
             },
+            collaborations: {
+                note: "Premium feature (collaboration). Invitees must already have an account.",
+                list: "GET /api/collaborations?status=active|archived&page=&limit=",
+                create: "POST /api/collaborations (JSON: name, description?, linkedGalleryId?)",
+                get: "GET /api/collaborations/:id",
+                update: "PATCH /api/collaborations/:id",
+                delete: "DELETE /api/collaborations/:id",
+                pendingInvites: "GET /api/collaborations/invites/pending",
+                acceptByToken: "POST /api/collaborations/invites/:token/accept",
+                declineByToken: "POST /api/collaborations/invites/:token/decline",
+                acceptInApp: "POST /api/collaborations/:id/invites/accept",
+                members: "GET /api/collaborations/:id/members",
+                invite: "POST /api/collaborations/:id/invites (JSON: email, role=editor|viewer)",
+                resendInvite: "POST /api/collaborations/:id/members/:memberId/resend",
+                updateMember: "PATCH /api/collaborations/:id/members/:memberId (JSON: role)",
+                removeMember: "DELETE /api/collaborations/:id/members/:memberId",
+                leave: "POST /api/collaborations/:id/leave",
+                folders: "GET|POST /api/collaborations/:id/folders",
+                folder: "PATCH|DELETE /api/collaborations/:id/folders/:folderId",
+                media: "GET /api/collaborations/:id/media?folderId=&mediaType=&page=&limit=",
+                uploadPresign: "POST /api/collaborations/:id/uploads/presign",
+                uploadComplete: "POST /api/collaborations/:id/uploads/complete",
+                uploadLocal: "POST /api/collaborations/:id/uploads (multipart when S3 off)",
+            },
+            studioTeam: {
+                note: "Premium feature (studioTeam). Create staff users with roles and menu access. Owner only. Separate from collaborations.",
+                meta: "GET /api/studio/meta",
+                list: "GET /api/studio/team",
+                create:
+                    "POST /api/studio/team (JSON: email, role=admin|editor|viewer, displayName?, password?, menuKeys?[])",
+                update:
+                    "PATCH /api/studio/team/:memberId (JSON: role?, menuKeys?, displayName?, status=active|disabled)",
+                remove: "DELETE /api/studio/team/:memberId",
+                resetPassword:
+                    "POST /api/studio/team/:memberId/reset-password (JSON: password?)",
+            },
             trash: {
                 list: "GET /api/trash",
                 restore: "POST /api/trash/restore",
@@ -544,6 +582,8 @@ app.use("/api/income", incomeRoutes)
 app.use("/api/dashboard", dashboardRoutes)
 app.use("/api/storage", storageRoutes)
 app.use("/api/billing", billingRoutes)
+app.use("/api/collaborations", collaborationRoutes)
+app.use("/api/studio", studioTeamRoutes)
 app.use("/api/sync", syncRoutes)
 app.use("/api/events", eventsRoutes)
 

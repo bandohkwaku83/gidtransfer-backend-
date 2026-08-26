@@ -4,7 +4,7 @@ export const EMAIL_VERIFICATION_EXPIRY_MS = 15 * 60 * 1000 // 15 minutes
 export const EMAIL_VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000 // 60 seconds
 
 export const createEmailVerificationOtp = () => {
-    const code = String(Math.floor(100000 + Math.random() * 900000))
+    const code = String(Math.floor(1000 + Math.random() * 9000))
     const hash = hashEmailVerificationOtp(code)
     return { code, hash }
 }

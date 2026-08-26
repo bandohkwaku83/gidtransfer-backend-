@@ -8,10 +8,12 @@ import {
     verifyBillingPayment,
 } from "../controllers/billingController.js"
 import { protectUser } from "../middleware/userAuth.js"
+import { requireStudioOwner } from "../middleware/requireMenu.js"
 
 const router = express.Router()
 
 router.use(protectUser)
+router.use(requireStudioOwner)
 
 router.get("/config", getBillingConfig)
 router.get("/plans", listBillingPlans)

@@ -59,6 +59,8 @@ const PRO_FEATURE_KEYS = [
 const PREMIUM_FEATURE_KEYS = [
     ...PRO_FEATURE_KEYS,
     "galleryAi",
+    "collaboration",
+    "studioTeam",
 ]
 
 /** null maxGalleries = unlimited */
@@ -68,7 +70,7 @@ const planDefinitions = [
         name: "Free",
         storageLimitBytes: FREE_PLAN_LIMIT_BYTES,
         maxGalleries: 3,
-        maxTeamMembers: null,
+        maxTeamMembers: 0,
         priceGhs: 0,
         interval: "monthly",
         trialDays: FREE_TRIAL_DAYS,
@@ -95,7 +97,7 @@ const planDefinitions = [
         name: "Basic",
         storageLimitBytes: 25 * GIB,
         maxGalleries: 10,
-        maxTeamMembers: null,
+        maxTeamMembers: 0,
         priceGhs: 40,
         interval: "monthly",
         trialDays: null,
@@ -125,7 +127,7 @@ const planDefinitions = [
         name: "Pro",
         storageLimitBytes: 100 * GIB,
         maxGalleries: 50,
-        maxTeamMembers: null,
+        maxTeamMembers: 0,
         priceGhs: 70,
         interval: "monthly",
         trialDays: null,
@@ -154,7 +156,7 @@ const planDefinitions = [
         name: "Premium",
         storageLimitBytes: 250 * GIB,
         maxGalleries: null,
-        maxTeamMembers: null,
+        maxTeamMembers: 10,
         priceGhs: 120,
         interval: "monthly",
         trialDays: null,
@@ -164,13 +166,15 @@ const planDefinitions = [
         aliases: ["studio"],
         videoUploadLimitBytes: 20 * GIB,
         description:
-            "Premium plan — unlimited galleries, 20 GB video uploads, Gallery AI, trash restore, full Pro toolkit, and 250 GB storage.",
+            "Premium plan — unlimited galleries, 20 GB video uploads, Gallery AI, studio team, team collaboration, trash restore, full Pro toolkit, and 250 GB storage.",
         perks: [
             "Everything in Pro",
             "Unlimited client galleries",
             "250 GB storage",
             "Video uploads (up to 20 GB)",
             "Gallery AI descriptions & smart picks",
+            "Studio team (create users, roles & menus)",
+            "Team collaboration (up to 10 members)",
             "Restore deleted galleries & photos",
             "Premium support",
         ],

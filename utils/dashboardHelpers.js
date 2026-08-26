@@ -2,11 +2,18 @@ import Gallery from "../models/Gallery.js"
 import GalleryPhoto from "../models/GalleryPhoto.js"
 import GalleryFinal from "../models/GalleryFinal.js"
 import GalleryAnalyticsEvent from "../models/GalleryAnalyticsEvent.js"
+import Client from "../models/Client.js"
+import Booking from "../models/Booking.js"
 import {
     galleryNotDeletedFilter,
     galleryOwnerFilter,
 } from "./galleryFields.js"
-import { weekRangeLocal } from "./bookingFields.js"
+import {
+    bookingOwnerFilter,
+    formatBookingResponse,
+    weekRangeLocal,
+} from "./bookingFields.js"
+import { formatClientEmbed } from "./clientFields.js"
 import { resolveMediaUrl } from "./formatUserResponse.js"
 import { formatBytesLabel } from "./storageFields.js"
 
@@ -345,10 +352,15 @@ export const formatDashboardActivityItem = (galleryDoc) => {
         id: card.id,
         galleryId: card.id,
         name: card.name,
+        title: card.name,
         action: activity.action,
         actionLabel: activity.label,
         status: card.status,
+        statusLabel: card.statusLabel,
+        client: card.client,
+        project: card.name,
         occurredAt: card.updatedAt,
+        date: card.updatedAt,
         thumbnailUrl: card.thumbnailUrl,
     }
 }
@@ -358,7 +370,7 @@ export const loadRecentGalleries = async (ownerId, limit = 10) => {
         ...galleryOwnerFilter(ownerId),
         ...galleryNotDeletedFilter(),
     })
-        .populate("client", "name")
+        .populate("client", "name email phone location")
         .sort({ updatedAt: -1 })
         .limit(limit)
         .exec()
@@ -366,16 +378,190 @@ export const loadRecentGalleries = async (ownerId, limit = 10) => {
     return rows.map(formatDashboardGalleryCard)
 }
 
-export const loadRecentActivity = async (ownerId, limit = 10) => {
+/** Newest galleries by creation date (for “New galleries”). */
+export const loadNewGalleries = async (ownerId, limit = 5) => {
     const rows = await Gallery.find({
         ...galleryOwnerFilter(ownerId),
         ...galleryNotDeletedFilter(),
     })
+        .populate("client", "name email phone location")
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .exec()
+
+    return rows.map(formatDashboardGalleryCard)
+}
+
+export const loadRecentActivity = async (ownerId, limit = 4) => {
+    const rows = await Gallery.find({
+        ...galleryOwnerFilter(ownerId),
+        ...galleryNotDeletedFilter(),
+    })
+        .populate("client", "name")
         .sort({ updatedAt: -1 })
         .limit(limit)
         .exec()
 
     return rows.map(formatDashboardActivityItem)
+}
+
+export const loadNewClients = async (ownerId, limit = 4) => {
+    const rows = await Client.find({ owner: ownerId })
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .lean()
+
+    return rows.map((row) => {
+        const client = formatClientEmbed(row)
+        return {
+            id: client.id,
+            name: client.name,
+            email: client.email,
+            phone: client.phone,
+            location: client.location,
+            createdAt: client.createdAt,
+            dateAdded: client.createdAt,
+        }
+    })
+}
+
+const selectionCountsByGallery = async (galleryIds) => {
+    if (!galleryIds.length) return new Map()
+
+    const rows = await GalleryPhoto.aggregate([
+        {
+            $match: {
+                gallery: { $in: galleryIds },
+                deletedAt: null,
+                selectedByClient: true,
+            },
+        },
+        {
+            $group: {
+                _id: "$gallery",
+                selectedCount: { $sum: 1 },
+                lastSelectedAt: { $max: "$selectedAt" },
+            },
+        },
+    ])
+
+    return new Map(
+        rows.map((row) => [
+            String(row._id),
+            {
+                selectedCount: row.selectedCount,
+                lastSelectedAt: row.lastSelectedAt ?? null,
+            },
+        ])
+    )
+}
+
+/** Galleries currently in client selection / proofing. */
+export const loadCurrentSelections = async (ownerId, limit = 4) => {
+    const rows = await Gallery.find({
+        ...galleryOwnerFilter(ownerId),
+        ...galleryNotDeletedFilter(),
+        status: "selecting",
+    })
+        .populate("client", "name email phone location")
+        .sort({ updatedAt: -1 })
+        .limit(limit)
+        .exec()
+
+    const counts = await selectionCountsByGallery(rows.map((g) => g._id))
+
+    return rows.map((galleryDoc) => {
+        const card = formatDashboardGalleryCard(galleryDoc)
+        const plain = galleryDoc.toObject?.({ virtuals: true }) ?? galleryDoc
+        const maxSelections =
+            plain.maxSelections == null ? null : Number(plain.maxSelections)
+        const stats = counts.get(card.id) ?? {
+            selectedCount: 0,
+            lastSelectedAt: null,
+        }
+        const selectedCount = stats.selectedCount
+        const progressPercent =
+            maxSelections != null && maxSelections > 0
+                ? Math.min(
+                      100,
+                      Math.round((selectedCount / maxSelections) * 100)
+                  )
+                : null
+
+        return {
+            id: card.id,
+            galleryId: card.id,
+            name: card.name,
+            galleryName: card.name,
+            status: card.status,
+            statusLabel: card.statusLabel,
+            selectionStatus: "in_progress",
+            client: card.client,
+            selectedCount,
+            maxSelections,
+            selectionsRemaining:
+                maxSelections != null
+                    ? Math.max(0, maxSelections - selectedCount)
+                    : null,
+            progressPercent,
+            progressLabel:
+                maxSelections != null
+                    ? `${selectedCount} of ${maxSelections} selected`
+                    : `${selectedCount} selected`,
+            lastSelectedAt: stats.lastSelectedAt,
+            updatedAt: card.updatedAt,
+            thumbnailUrl: card.thumbnailUrl,
+        }
+    })
+}
+
+/**
+ * Upcoming bookings for the schedule + map section.
+ * `location` is free text — frontend geocodes for map markers.
+ */
+export const loadUpcomingSchedules = async (ownerId, limit = 12) => {
+    const rows = await Booking.find({
+        ...bookingOwnerFilter(ownerId),
+        startsAt: { $gte: new Date() },
+    })
+        .populate({ path: "client", select: "name email phone location" })
+        .sort({ startsAt: 1 })
+        .limit(limit)
+        .exec()
+
+    return rows.map((booking) => {
+        const full = formatBookingResponse(booking)
+        const locationText = full.location?.trim() || ""
+        const clientLocation = full.client?.location?.trim() || ""
+        const mapLocation = locationText || clientLocation || null
+
+        return {
+            id: full._id,
+            bookingId: full._id,
+            title: full.title,
+            date: full.startsAt,
+            startsAt: full.startsAt,
+            endsAt: full.endsAt,
+            time: full.startsAt,
+            client: full.client
+                ? {
+                      id: full.client._id,
+                      name: full.client.name,
+                      email: full.client.email,
+                      phone: full.client.contact,
+                      location: full.client.location,
+                  }
+                : null,
+            location: mapLocation,
+            locationLabel: mapLocation,
+            /** Null until frontend geocodes `location` (bookings store address text only). */
+            coordinates: null,
+            shootType: full.shootType,
+            category: full.category,
+            color: full.color,
+            description: full.description,
+        }
+    })
 }
 
 export const formatDashboardStorage = (breakdown, plan, videoLimitBytes = 0) => {

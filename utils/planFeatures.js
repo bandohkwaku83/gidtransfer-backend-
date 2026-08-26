@@ -167,6 +167,20 @@ export const FEATURE_CATALOG = [
         description:
             "AI helps on both sides: the photographer can generate gallery descriptions; the client can start AI smart picks that score photos (quality, faces, blur), skip near-duplicates, and suggest a diverse set to heart in one tap.",
     },
+    {
+        key: "collaboration",
+        label: "Team collaboration",
+        category: "studio",
+        description:
+            "Create shared project workspaces, invite registered photographers as editors or viewers, and upload media together. Seat limit is set by the plan (maxTeamMembers).",
+    },
+    {
+        key: "studioTeam",
+        label: "Studio team",
+        category: "studio",
+        description:
+            "Create staff user accounts for your studio, assign roles, and control which app menus each person can access. Seat limit is set by the plan (maxTeamMembers).",
+    },
 ]
 
 const FEATURE_KEY_SET = new Set(FEATURE_CATALOG.map((item) => item.key))
@@ -327,6 +341,8 @@ export const formatPlanComparison = () => {
         "customBranding",
         "advancedAnalytics",
         "galleryAi",
+        "collaboration",
+        "studioTeam",
         "restoreTrashItems",
     ]
 

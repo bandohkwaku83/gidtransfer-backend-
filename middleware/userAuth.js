@@ -13,6 +13,7 @@ import {
     isApiTokenString,
     touchApiTokenUsage,
 } from "../utils/apiTokens.js"
+import { loadActiveStudioMembership } from "../utils/studioContext.js"
 
 const AUTH_CACHE_TTL_MS = Number(process.env.AUTH_CACHE_TTL_MS ?? 60_000)
 
@@ -34,6 +35,23 @@ const bearerToken = (authHeader) => {
     const token = authHeader.slice(7).trim()
     if (!token || token === "undefined" || token === "null") return null
     return token
+}
+
+const attachStudioContext = async (req, actorUser) => {
+    req.actor = actorUser
+    req.membership = null
+    req.studioOwnerId = null
+
+    const ctx = await loadActiveStudioMembership(actorUser._id)
+    if (!ctx) {
+        req.user = actorUser
+        return
+    }
+
+    // Staff sessions: identity on req.actor; data + plan use the studio owner.
+    req.membership = ctx.membership
+    req.studioOwnerId = ctx.owner._id
+    req.user = ctx.owner
 }
 
 export const protectUser = async (req, res, next) => {
@@ -70,7 +88,7 @@ export const protectUser = async (req, res, next) => {
             }
 
             touchApiTokenUsage(apiToken).catch(() => {})
-            req.user = user
+            await attachStudioContext(req, user)
             req.authVia = "api_token"
             return next()
         }
@@ -119,7 +137,7 @@ export const protectUser = async (req, res, next) => {
 
         touchUserActivity(userId, decoded.sid ?? null).catch(() => {})
 
-        req.user = User.hydrate(user)
+        await attachStudioContext(req, User.hydrate(user))
         next()
     } catch (err) {
         console.error("[auth] protectUser error:", err)

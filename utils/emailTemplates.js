@@ -416,7 +416,7 @@ export const emailVerificationOtpEmail = ({ code }) => {
         html: layout({
             label: "Account security",
             title,
-            subtitle: "Your 6-digit verification code",
+            subtitle: "Your 4-digit verification code",
             bodyHtml,
         }),
         text: `Your verification code is ${code}. It expires in 15 minutes.`,
@@ -441,6 +441,79 @@ export const passwordResetEmail = ({ resetUrl }) => {
             ctaUrl: resetUrl,
         }),
         text: `Reset your password: ${resetUrl}`,
+    }
+}
+
+export const collaborationInviteEmail = ({
+    inviteeName,
+    ownerStudioName,
+    workspaceName,
+    role,
+    acceptUrl,
+}) => {
+    const title = "You're invited to collaborate"
+    const roleLabel = role === "viewer" ? "viewer" : "editor"
+    const bodyHtml = `
+      ${introLine(
+          inviteeName,
+          `<strong style="color:${COLORS.ink};">${escapeHtml(ownerStudioName || "A photographer")}</strong> invited you to the project <strong style="color:${COLORS.ink};">${escapeHtml(workspaceName || "Untitled")}</strong> as an <strong>${escapeHtml(roleLabel)}</strong>.`
+      )}
+      ${bodyParagraph(
+          "Log in with this email address and accept the invite to open the shared workspace."
+      )}
+      ${bodyParagraph(
+          `This invite expires in <strong>7 days</strong>. If you weren't expecting it, you can ignore this email.`
+      )}
+    `
+
+    return {
+        subject: `${brandName()}: ${ownerStudioName || "A photographer"} invited you to “${workspaceName || "a project"}”`,
+        html: layout({
+            label: "Team collaboration",
+            title,
+            subtitle: workspaceName || "Shared project",
+            bodyHtml,
+            ctaLabel: "Accept invite",
+            ctaUrl: acceptUrl,
+        }),
+        text: `${ownerStudioName || "A photographer"} invited you to “${workspaceName || "a project"}” as ${roleLabel}. Accept: ${acceptUrl}`,
+    }
+}
+
+export const studioTeamWelcomeEmail = ({
+    displayName,
+    ownerStudioName,
+    role,
+    password,
+    loginUrl,
+}) => {
+    const title = "Your studio account is ready"
+    const passwordBlock = password
+        ? bodyParagraph(
+              `Temporary password: <strong style="color:${COLORS.ink};letter-spacing:0.04em;">${escapeHtml(password)}</strong> — change it after you sign in.`
+          )
+        : bodyParagraph("Use the password your studio owner shared with you.")
+
+    const bodyHtml = `
+      ${introLine(
+          displayName,
+          `<strong style="color:${COLORS.ink};">${escapeHtml(ownerStudioName || "Your studio")}</strong> created a team account for you as <strong>${escapeHtml(role || "editor")}</strong>.`
+      )}
+      ${passwordBlock}
+      ${bodyParagraph("Sign in to open the studio menus assigned to you.")}
+    `
+
+    return {
+        subject: `${brandName()}: join ${ownerStudioName || "your studio"} team`,
+        html: layout({
+            label: "Studio team",
+            title,
+            subtitle: ownerStudioName || "Studio access",
+            bodyHtml,
+            ctaLabel: "Sign in",
+            ctaUrl: loginUrl,
+        }),
+        text: `${ownerStudioName || "Your studio"} created a team account for you (${role}). Sign in: ${loginUrl}${password ? ` Temporary password: ${password}` : ""}`,
     }
 }
 

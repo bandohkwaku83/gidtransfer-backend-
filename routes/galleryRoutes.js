@@ -70,10 +70,12 @@ import { handleGalleryMusicUpload } from "../middleware/uploadGalleryMusic.js"
 import { handleGalleryFinalsUpload } from "../middleware/uploadGalleryFinals.js"
 import { protectUser } from "../middleware/userAuth.js"
 import { requirePlanFeature } from "../middleware/requirePlanFeature.js"
+import { requireMenu } from "../middleware/requireMenu.js"
 
 const router = express.Router()
 
 router.use(protectUser)
+router.use(requireMenu("galleries"))
 
 router.post("/generate-description", proposeGalleryDescription)
 router.get("/meta", getGalleriesMeta)

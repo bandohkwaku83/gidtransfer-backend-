@@ -13,10 +13,12 @@ import {
     updateBooking,
 } from "../controllers/bookingController.js"
 import { protectUser } from "../middleware/userAuth.js"
+import { requireMenu } from "../middleware/requireMenu.js"
 
 const router = express.Router()
 
 router.use(protectUser)
+router.use(requireMenu("bookings"))
 
 router.get("/meta", getBookingsMeta)
 router.get("/week-summary", getBookingsWeekSummary)

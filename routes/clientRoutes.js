@@ -7,10 +7,12 @@ import {
     updateClient,
 } from "../controllers/clientController.js"
 import { protectUser } from "../middleware/userAuth.js"
+import { requireMenu } from "../middleware/requireMenu.js"
 
 const router = express.Router()
 
 router.use(protectUser)
+router.use(requireMenu("clients"))
 
 router.get("/", listClients)
 router.get("/:id", getClient)

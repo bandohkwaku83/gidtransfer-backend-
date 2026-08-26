@@ -78,9 +78,19 @@ export const formatStudioUrlFields = (studio) => {
     }
 }
 
-export const formatUserResponse = (user) => {
+export const formatUserResponse = (user, options = {}) => {
     const doc = user.toJSON ? user.toJSON() : user
-    const studio = doc.studio ?? {}
+    const planDoc = options.planFrom
+        ? options.planFrom.toJSON
+            ? options.planFrom.toJSON()
+            : options.planFrom
+        : doc
+    const studioDoc = options.studioFrom
+        ? options.studioFrom.toJSON
+            ? options.studioFrom.toJSON()
+            : options.studioFrom
+        : doc
+    const studio = studioDoc.studio ?? {}
     const companyName = studio.companyName?.trim() || ""
     const phone = studio.phone?.trim() || ""
     const primaryDeliverable = studio.primaryDeliverable?.trim() || ""
@@ -138,9 +148,10 @@ export const formatUserResponse = (user) => {
           }
         : null
 
-    const planSummary = getPlanSummaryForUser(doc)
+    const planSummary = getPlanSummaryForUser(planDoc)
+    const onboardingSource = studioDoc
 
-    return {
+    const payload = {
         _id: doc._id,
         accountId: doc.accountId?.trim() || null,
         email: doc.email,
@@ -157,7 +168,7 @@ export const formatUserResponse = (user) => {
         ...(avatarSrc ? { avatarSrc } : {}),
         emailNotifications: formatEmailNotificationsResponse(doc),
         onboardingComplete: Boolean(
-            doc.onboardingCompletedAt &&
+            onboardingSource.onboardingCompletedAt &&
                 companyName &&
                 phone &&
                 companySlug &&
@@ -188,4 +199,16 @@ export const formatUserResponse = (user) => {
             subscription: planSummary.subscription,
         },
     }
+
+    if (options.accountType) {
+        payload.accountType = options.accountType
+    }
+    if (options.membership) {
+        payload.membership = options.membership
+    }
+    if (options.studioOwnerId) {
+        payload.studioOwnerId = String(options.studioOwnerId)
+    }
+
+    return payload
 }

@@ -32,10 +32,12 @@ import { handleUploadWatermarkLogo } from "../middleware/uploadWatermark.js"
 import { handleUploadGalleryDefaultCover } from "../middleware/uploadGalleryDefaults.js"
 import { handleUploadIssueReport } from "../middleware/uploadIssueReport.js"
 import { protectUser } from "../middleware/userAuth.js"
+import { requireMenu } from "../middleware/requireMenu.js"
 
 const router = express.Router()
 
 router.use(protectUser)
+router.use(requireMenu("settings"))
 
 router.get("/", getSettings)
 router.put("/", handleUploadSettings, updateSettings)

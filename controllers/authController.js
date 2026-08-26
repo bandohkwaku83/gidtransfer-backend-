@@ -6,6 +6,7 @@ import { beginUserSession, endAllUserSessions, issueAuthenticatedSession } from 
 import { providerSignInHint } from "../utils/authMessages.js"
 import { nextAccountId } from "../utils/accountId.js"
 import { formatUserResponse } from "../utils/formatUserResponse.js"
+import { formatAuthUserPayload } from "../utils/formatAuthUser.js"
 import { defaultTrialEndsAt } from "../utils/planCatalog.js"
 import {
     createPasswordResetToken,
@@ -33,11 +34,12 @@ const authSuccess = async (
         req,
         authMethod,
     })
+    const shaped = await formatAuthUserPayload(updatedUser)
     return {
         message,
         token,
-        user: formatUserResponse(updatedUser),
-        requiresEmailVerification: !formatUserResponse(updatedUser).emailVerified,
+        user: shaped,
+        requiresEmailVerification: !shaped.emailVerified,
     }
 }
 
@@ -160,15 +162,18 @@ export const login = async (req, res) => {
 }
 
 export const me = async (req, res) => {
-    return res.status(200).json({ user: formatUserResponse(req.user) })
+    const actor = req.actor ?? req.user
+    const user = await formatAuthUserPayload(actor, req)
+    return res.status(200).json({ user })
 }
 
 export const logout = async (req, res) => {
     try {
-        await endAllUserSessions(req.user._id, "logout")
-        req.user.tokenVersion = (req.user.tokenVersion ?? 0) + 1
-        await req.user.save()
-        cacheDeletePrefix(`auth:user:${req.user._id}:`)
+        const actor = req.actor ?? req.user
+        await endAllUserSessions(actor._id, "logout")
+        actor.tokenVersion = (actor.tokenVersion ?? 0) + 1
+        await actor.save()
+        cacheDeletePrefix(`auth:user:${actor._id}:`)
 
         return res.status(200).json({ message: "Signed out successfully" })
     } catch (error) {
@@ -368,8 +373,8 @@ export const googleAuth = async (req, res) => {
 export const verifyEmail = async (req, res) => {
     try {
         const code = String(req.body?.code ?? req.body?.otp ?? "").trim()
-        if (!/^\d{6}$/.test(code)) {
-            return res.status(400).json({ message: "A valid 6-digit code is required" })
+        if (!/^\d{4}$/.test(code)) {
+            return res.status(400).json({ message: "A valid 4-digit code is required" })
         }
 
         if (req.user.emailVerifiedAt) {

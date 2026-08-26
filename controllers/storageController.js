@@ -78,6 +78,7 @@ export const getStorage = async (req, res) => {
                     rawsBytes: breakdown.rawsBytes,
                     selectionsBytes: breakdown.selectionsBytes,
                     finalsBytes: breakdown.finalsBytes,
+                    collaborationBytes: breakdown.collaborationBytes ?? 0,
                 },
                 videoUsedBytes: breakdown.videoUsedBytes,
                 videoUploadLimitBytes,

@@ -16,3 +16,7 @@ export const dashboardUrl = (companySlug) =>
 
 export const billingUrl = (companySlug) =>
     `${photographerAppBase(companySlug)}/billing`
+
+/** Accept a collaboration invite (token is the raw invite token). */
+export const collaborationInviteUrl = (token, companySlug) =>
+    `${photographerAppBase(companySlug)}/collaborations/invites/${encodeURIComponent(token)}`

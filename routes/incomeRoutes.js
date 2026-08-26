@@ -8,10 +8,12 @@ import {
     updateIncome,
 } from "../controllers/incomeController.js"
 import { protectUser } from "../middleware/userAuth.js"
+import { requireMenu } from "../middleware/requireMenu.js"
 
 const router = express.Router()
 
 router.use(protectUser)
+router.use(requireMenu("income"))
 
 router.get("/summary", getIncomeSummary)
 router.get("/", listIncome)

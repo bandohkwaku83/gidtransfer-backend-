@@ -1,6 +1,8 @@
 import Gallery from "../models/Gallery.js"
 import GalleryPhoto from "../models/GalleryPhoto.js"
 import GalleryFinal from "../models/GalleryFinal.js"
+import CollaborationAsset from "../models/CollaborationAsset.js"
+import mongoose from "mongoose"
 import {
     galleryNotDeletedFilter,
     galleryOwnerFilter,
@@ -18,6 +20,7 @@ const emptyBreakdown = () => ({
     rawsBytes: 0,
     selectionsBytes: 0,
     finalsBytes: 0,
+    collaborationBytes: 0,
     totalBytes: 0,
     videoUsedBytes: 0,
 })
@@ -46,7 +49,7 @@ const recomputeGalleryTotal = (usage) => {
 export const getOwnerStorageByGallery = async (ownerId, galleryIds = null) => {
     const ids = await resolveGalleryIds(ownerId, galleryIds)
 
-    const [photoRawAgg, photoSelectionAgg, finalAgg, videoPhotoAgg, videoFinalAgg] =
+    const [photoRawAgg, photoSelectionAgg, finalAgg, videoPhotoAgg, videoFinalAgg, collabAgg, collabVideoAgg] =
         await Promise.all([
             ids.length
                 ? GalleryPhoto.aggregate([
@@ -135,6 +138,40 @@ export const getOwnerStorageByGallery = async (ownerId, galleryIds = null) => {
                       },
                   ])
                 : [],
+            ownerId && mongoose.isValidObjectId(ownerId)
+                ? CollaborationAsset.aggregate([
+                      {
+                          $match: {
+                              owner: new mongoose.Types.ObjectId(String(ownerId)),
+                              deletedAt: null,
+                              isVideo: { $ne: true },
+                          },
+                      },
+                      {
+                          $group: {
+                              _id: null,
+                              bytes: { $sum: "$sizeBytes" },
+                          },
+                      },
+                  ])
+                : [],
+            ownerId && mongoose.isValidObjectId(ownerId)
+                ? CollaborationAsset.aggregate([
+                      {
+                          $match: {
+                              owner: new mongoose.Types.ObjectId(String(ownerId)),
+                              deletedAt: null,
+                              isVideo: true,
+                          },
+                      },
+                      {
+                          $group: {
+                              _id: null,
+                              bytes: { $sum: "$sizeBytes" },
+                          },
+                      },
+                  ])
+                : [],
         ])
 
     const usageByGallery = new Map()
@@ -160,6 +197,12 @@ export const getOwnerStorageByGallery = async (ownerId, galleryIds = null) => {
         breakdown.totalBytes += usage.totalBytes
         breakdown.videoUsedBytes += usage.videoBytes
     }
+
+    const collabBytes = Number(collabAgg[0]?.bytes) || 0
+    const collabVideoBytes = Number(collabVideoAgg[0]?.bytes) || 0
+    breakdown.collaborationBytes = collabBytes
+    breakdown.totalBytes += collabBytes
+    breakdown.videoUsedBytes += collabVideoBytes
 
     return { usageByGallery, breakdown, galleryIds: ids }
 }

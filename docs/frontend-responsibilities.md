@@ -101,7 +101,7 @@ NEXT_PUBLIC_GOOGLE_CLIENT_ID=<same as backend GOOGLE_CLIENT_ID>
 | Area | API routes | Notes |
 |------|------------|-------|
 | Onboarding | `GET/POST/PUT /api/onboarding` | Company setup, logo, SMS sender ID request |
-| Dashboard | `GET /api/dashboard` | Home stats |
+| Dashboard | `GET /api/dashboard` | Organizer home: `recentActivity` (4), `newClients` (4), `currentSelections` (4), `newGalleries` (5), `schedules` (upcoming bookings + `location` for map), plus `stats` / `storage` / `weeklyActivity`. Geocode `schedules[].location` on the client for map markers (`coordinates` is null from API). |
 | Clients | `/api/clients` | CRUD |
 | Bookings | `/api/bookings` | Calendar, CRUD, reminders |
 | Income | `/api/income` | CRUD, yearly summary |
