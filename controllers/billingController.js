@@ -4,28 +4,37 @@ import BillingEvent from "../models/BillingEvent.js"
 import {
     PaystackError,
     disablePaystackSubscription,
+    enablePaystackSubscription,
     fetchPaystackPlan,
     fetchPaystackSubscription,
+    findPaystackSubscription,
     initializePaystackTransaction,
     paystackConfigured,
     paystackPublicKey,
     verifyPaystackTransaction,
 } from "../services/paystack.js"
 import {
-    getPlanById,
+    BILLING_INTERVALS,
+    getCheckoutPlan,
     getPlanByPaystackCode,
+    getUserBillingInterval,
+    normalizeBillingInterval,
     normalizePlanId,
     planAmountPesewas,
 } from "../utils/planCatalog.js"
 import {
+    applyPaystackSubscriptionStopped,
     applySubscriptionFromPaystack,
     formatBillingPlansPayload,
     formatBillingSubscriptionResponse,
     getPlanSummaryForUser,
     isPaidSubscriptionActive,
-    resetSubscriptionToFree,
+    resumePaidSubscription,
+    scheduleCancellationAtPeriodEnd,
 } from "../utils/subscriptionFields.js"
 import { queueNotifyPlanUpgraded } from "../utils/photographerBillingNotify.js"
+import { invalidateOwnerFeatureCache } from "../utils/planFeatures.js"
+import { invalidateAuthUserCache } from "../middleware/userAuth.js"
 
 const handleBillingError = (res, error) => {
     if (error instanceof PaystackError) {
@@ -60,6 +69,54 @@ const billingCallbackUrl = () => {
 }
 
 /**
+ * Paystack must return to the same browser host that holds the JWT.
+ * Studio subdomains ({slug}.localhost / {slug}.gidtransfer.com) are allowed
+ * when they match APP_URL's registrable host.
+ */
+const resolveCheckoutCallbackUrl = (requested) => {
+    const fallback = billingCallbackUrl()
+    const raw = String(requested ?? "").trim()
+    if (!raw) return fallback
+
+    let parsed
+    try {
+        parsed = new URL(raw)
+    } catch {
+        return fallback
+    }
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return fallback
+    }
+
+    const path = parsed.pathname.replace(/\/+$/, "") || "/"
+    if (path !== "/billing/callback") return fallback
+
+    const appUrl = process.env.APP_URL?.trim()
+    let allowedHost = ""
+    try {
+        allowedHost = appUrl ? new URL(appUrl).hostname.toLowerCase() : ""
+    } catch {
+        allowedHost = ""
+    }
+
+    const host = parsed.hostname.toLowerCase()
+    const allowed =
+        host === "localhost" ||
+        host.endsWith(".localhost") ||
+        (allowedHost &&
+            (host === allowedHost || host.endsWith(`.${allowedHost}`)))
+
+    if (!allowed) return fallback
+    return `${parsed.origin}/billing/callback`
+}
+
+const touchBillingCaches = (userId) => {
+    invalidateOwnerFeatureCache(userId)
+    invalidateAuthUserCache(userId)
+}
+
+/**
  * Paystack charges the amount stored on the plan object, not the amount we pass
  * to transaction/initialize. Refuse checkout when the remote plan is stale.
  */
@@ -90,6 +147,106 @@ const parsePaystackDate = (value) => {
 const loadUserWithSubscriptionSecrets = async (userId) =>
     User.findById(userId).select("+subscription.paystackEmailToken")
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const subscriptionFromPaystackRow = (row) => {
+    if (!row || typeof row !== "object") return null
+    const subscriptionCode =
+        row.subscription_code || row.code || row.subscriptionCode || ""
+    if (!subscriptionCode) return null
+    return {
+        subscription_code: subscriptionCode,
+        email_token: row.email_token || row.emailToken || "",
+        status: row.status,
+        next_payment_date: row.next_payment_date || row.nextPaymentDate || null,
+        plan: row.plan,
+        plan_code: row.plan?.plan_code || row.plan_code || "",
+        customer: row.customer,
+    }
+}
+
+/**
+ * Transaction verify often confirms the charge before Paystack attaches the
+ * subscription. Look on the payload first, then list the customer's subs.
+ */
+const resolvePaystackSubscriptionForPayment = async ({
+    transaction,
+    subscriptionCode = "",
+    customerCode = "",
+    email = "",
+    planCode = "",
+    retryMs = 1500,
+} = {}) => {
+    const fromPayload = subscriptionFromPaystackRow(
+        transaction?.subscription ||
+            (subscriptionCode ? { subscription_code: subscriptionCode } : null)
+    )
+    if (fromPayload?.email_token) {
+        try {
+            const remote = await fetchPaystackSubscription(fromPayload.subscription_code)
+            return subscriptionFromPaystackRow(remote) || fromPayload
+        } catch {
+            return fromPayload
+        }
+    }
+    if (fromPayload?.subscription_code) {
+        try {
+            const remote = await fetchPaystackSubscription(fromPayload.subscription_code)
+            if (remote) return subscriptionFromPaystackRow(remote) || fromPayload
+        } catch {
+            /* fall through to customer lookup */
+        }
+    }
+
+    const lookup = async () =>
+        subscriptionFromPaystackRow(
+            await findPaystackSubscription({
+                customerCode,
+                email,
+                planCode,
+            })
+        )
+
+    let found = await lookup().catch(() => null)
+    if (!found && retryMs > 0) {
+        await sleep(retryMs)
+        found = await lookup().catch(() => null)
+    }
+    return found
+}
+
+const recoverPaystackSubscriptionOnUser = async (
+    user,
+    { includeDisabled = false } = {}
+) => {
+    const sub = user.subscription ?? {}
+    let code = sub.paystackSubscriptionCode?.trim() || ""
+    let token = sub.paystackEmailToken?.trim() || ""
+    if (code && token) return { code, token }
+
+    const remote = await findPaystackSubscription({
+        customerCode: sub.paystackCustomerCode?.trim() || "",
+        email: user.email,
+        planCode: sub.paystackPlanCode?.trim() || "",
+        includeDisabled,
+    })
+    const resolved = subscriptionFromPaystackRow(remote)
+    if (!resolved?.subscription_code) return { code, token }
+
+    code = resolved.subscription_code
+    token = resolved.email_token || token
+    user.subscription.paystackSubscriptionCode = code
+    if (token) user.subscription.paystackEmailToken = token
+    if (resolved.plan_code) {
+        user.subscription.paystackPlanCode = resolved.plan_code
+    }
+    const periodEnd = parsePaystackDate(resolved.next_payment_date)
+    if (periodEnd) user.subscription.currentPeriodEnd = periodEnd
+    await user.save()
+    touchBillingCaches(user._id)
+    return { code, token }
+}
+
 const disableExistingSubscription = async (user) => {
     const sub = user.subscription ?? {}
     const code = sub.paystackSubscriptionCode?.trim()
@@ -107,6 +264,11 @@ const disableExistingSubscription = async (user) => {
     }
 }
 
+const resolveIntervalFromMetadata = (metadata = {}) =>
+    normalizeBillingInterval(
+        metadata.interval ?? metadata.billingInterval ?? metadata.billing_interval
+    )
+
 const activateUserSubscription = async ({
     userId,
     planId,
@@ -118,14 +280,14 @@ const activateUserSubscription = async ({
     currentPeriodEnd = null,
     cancelAtPeriodEnd = false,
     previousSubscriptionCode = "",
+    interval = "",
 }) => {
     const user = await loadUserWithSubscriptionSecrets(userId)
     if (!user) return null
 
-    if (
-        previousSubscriptionCode &&
-        previousSubscriptionCode !== subscriptionCode
-    ) {
+    const existingCode = user.subscription?.paystackSubscriptionCode?.trim() || ""
+    const oldCode = previousSubscriptionCode || existingCode
+    if (oldCode && subscriptionCode && oldCode !== subscriptionCode) {
         await disableExistingSubscription(user)
     }
 
@@ -139,9 +301,11 @@ const activateUserSubscription = async ({
         status,
         currentPeriodEnd,
         cancelAtPeriodEnd,
+        interval,
     })
 
     await user.save()
+    touchBillingCaches(user._id)
 
     if (planChanged && nextPlanId && nextPlanId !== "free") {
         queueNotifyPlanUpgraded(user)
@@ -230,9 +394,12 @@ const syncSubscriptionFromPaystackPayload = async ({
         ""
 
     let planId = resolvePlanIdFromMetadata(metadata)
+    const fromCode = getPlanByPaystackCode(paystackPlanCode)
     if (!planId) {
-        planId = getPlanByPaystackCode(paystackPlanCode)?.id || ""
+        planId = fromCode?.id || ""
     }
+    const interval =
+        resolveIntervalFromMetadata(metadata) || fromCode?.interval || ""
 
     const userId = resolveUserIdFromMetadata(metadata)
     if (!userId || !planId) {
@@ -263,6 +430,7 @@ const syncSubscriptionFromPaystackPayload = async ({
         ),
         cancelAtPeriodEnd: subscriptionPayload?.status === "non-renewing",
         previousSubscriptionCode,
+        interval,
     })
 }
 
@@ -303,6 +471,10 @@ export const checkoutBillingPlan = async (req, res) => {
         }
 
         const planId = normalizePlanId(req.body?.planId ?? req.body?.plan ?? "")
+        const interval =
+            normalizeBillingInterval(
+                req.body?.interval ?? req.body?.billingInterval ?? req.body?.billing_interval
+            ) || BILLING_INTERVALS.monthly
 
         if (!planId || planId === "free") {
             return res.status(400).json({
@@ -310,22 +482,41 @@ export const checkoutBillingPlan = async (req, res) => {
             })
         }
 
-        const plan = getPlanById(planId)
+        const plan = getCheckoutPlan(planId, interval)
         if (!plan) {
             return res.status(400).json({ message: "Unknown plan" })
         }
 
         if (!plan.paystackPlanCode) {
+            const envName =
+                interval === BILLING_INTERVALS.yearly
+                    ? plan.paystackYearlyPlanCodeEnv
+                    : plan.paystackPlanCodeEnv
             return res.status(503).json({
-                message: `Plan "${plan.name}" is not configured yet. Add ${plan.paystackPlanCodeEnv} to .env`,
+                message: `Plan "${plan.name}" (${interval}) is not configured yet. Add ${envName} to .env`,
                 code: "PLAN_NOT_CONFIGURED",
             })
         }
 
         await assertPaystackPlanAmountMatches(plan)
 
-        const currentPlanId = getPlanSummaryForUser(req.user).planId
-        if (currentPlanId === planId && isPaidSubscriptionActive(req.user)) {
+        const current = getPlanSummaryForUser(req.user)
+        const currentPlanId = current.planId
+        const currentInterval = getUserBillingInterval(req.user)
+        const alreadyPaid = isPaidSubscriptionActive(req.user)
+        const samePlanAndInterval =
+            currentPlanId === planId && currentInterval === interval
+        const cancellingCurrent =
+            alreadyPaid &&
+            samePlanAndInterval &&
+            (req.user.subscription?.cancelAtPeriodEnd === true ||
+                req.user.subscription?.status === "non_renewing")
+
+        if (cancellingCurrent) {
+            return resumeBillingSubscription(req, res)
+        }
+
+        if (samePlanAndInterval && alreadyPaid) {
             return res.status(409).json({
                 message: "You are already on this plan",
             })
@@ -336,7 +527,9 @@ export const checkoutBillingPlan = async (req, res) => {
         const metadata = {
             userId: String(user._id),
             planId: plan.id,
+            interval,
             accountId: user.accountId?.trim() || "",
+            previousPlanId: currentPlanId,
         }
 
         // Paystack requires transaction/initialize (with plan) for customers
@@ -349,18 +542,28 @@ export const checkoutBillingPlan = async (req, res) => {
             plan: plan.paystackPlanCode,
             amountPesewas: planAmountPesewas(plan),
             metadata,
-            callbackUrl: billingCallbackUrl(),
+            callbackUrl: resolveCheckoutCallbackUrl(
+                req.body?.callbackUrl ?? req.body?.callback_url
+            ),
         })
 
         user.subscription.pendingPlanId = planId
-        user.subscription.status = "pending"
+        user.subscription.pendingInterval = interval
+        // Keep the current paid plan live while Paystack checkout is open.
+        // First-time upgrades from Free still use `pending`.
+        if (!alreadyPaid) {
+            user.subscription.status = "pending"
+        }
         await user.save()
 
         return res.status(200).json({
-            message: "Continue payment on Paystack",
+            message: alreadyPaid
+                ? `Continue payment to switch to ${plan.name}`
+                : "Continue payment on Paystack",
             checkout: {
                 planId: plan.id,
                 planName: plan.name,
+                interval,
                 priceGhs: plan.priceGhs,
                 amountPesewas: planAmountPesewas(plan),
                 currency: "GHS",
@@ -368,6 +571,7 @@ export const checkoutBillingPlan = async (req, res) => {
                 accessCode: transaction.access_code,
                 reference: transaction.reference || null,
                 subscriptionCode: null,
+                switchingFrom: alreadyPaid ? currentPlanId : null,
             },
         })
     } catch (error) {
@@ -385,22 +589,141 @@ export const cancelBillingSubscription = async (req, res) => {
     try {
         const user = await loadUserWithSubscriptionSecrets(req.user._id)
         const sub = user.subscription ?? {}
-        const code = sub.paystackSubscriptionCode?.trim()
-        const token = sub.paystackEmailToken?.trim()
+        let code = sub.paystackSubscriptionCode?.trim()
+        let token = sub.paystackEmailToken?.trim()
 
-        if (!code || !token) {
+        if ((!code || !token) && isPaidSubscriptionActive(user)) {
+            try {
+                const recovered = await recoverPaystackSubscriptionOnUser(user)
+                code = recovered.code
+                token = recovered.token
+            } catch (error) {
+                console.warn(
+                    `[billing] Could not recover Paystack subscription for cancel ${user._id}:`,
+                    error.message
+                )
+            }
+        }
+
+        if (!isPaidSubscriptionActive(user)) {
             return res.status(400).json({
                 message: "No active subscription to cancel",
             })
         }
 
+        if (!code || !token) {
+            scheduleCancellationAtPeriodEnd(user, sub.currentPeriodEnd)
+            await user.save()
+            touchBillingCaches(user._id)
+            const summary = getPlanSummaryForUser(user)
+            return res.status(200).json({
+                message:
+                    "This plan will not renew. Paystack has not attached a recurring subscription yet, so we stopped renewal on your account. You keep access until the current period ends.",
+                subscription: formatBillingSubscriptionResponse(user),
+                plan: summary,
+            })
+        }
+
+        if (sub.cancelAtPeriodEnd === true || sub.status === "non_renewing") {
+            return res.status(200).json({
+                message:
+                    "Cancellation is already scheduled. You keep this plan until the current period ends.",
+                subscription: formatBillingSubscriptionResponse(user),
+            })
+        }
+
+        let periodEnd = sub.currentPeriodEnd ?? null
+        try {
+            const remote = await fetchPaystackSubscription(code)
+            periodEnd =
+                parsePaystackDate(
+                    remote?.next_payment_date || remote?.nextPaymentDate
+                ) || periodEnd
+        } catch (error) {
+            console.warn(
+                `[billing] Could not refresh subscription ${code} before cancel:`,
+                error.message
+            )
+        }
+
         await disablePaystackSubscription({ code, token })
 
-        resetSubscriptionToFree(user)
+        scheduleCancellationAtPeriodEnd(user, periodEnd)
         await user.save()
+        touchBillingCaches(user._id)
+
+        const summary = getPlanSummaryForUser(user)
+        const accessUntil = summary.subscription.accessUntil
+        const untilLabel = accessUntil
+            ? new Date(accessUntil).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+              })
+            : "the end of the current billing period, plus a 3-day grace"
 
         return res.status(200).json({
-            message: "Subscription cancelled. You are now on the Free plan.",
+            message: `Subscription will not renew. You keep ${summary.planName} until ${untilLabel}. After that you can only view existing work (the 30-day trial is not restarted).`,
+            subscription: formatBillingSubscriptionResponse(user),
+        })
+    } catch (error) {
+        return handleBillingError(res, error)
+    }
+}
+
+export const resumeBillingSubscription = async (req, res) => {
+    try {
+        const user = await loadUserWithSubscriptionSecrets(req.user._id)
+        const sub = user.subscription ?? {}
+        let code = sub.paystackSubscriptionCode?.trim()
+        let token = sub.paystackEmailToken?.trim()
+
+        if (!code || !token) {
+            try {
+                const recovered = await recoverPaystackSubscriptionOnUser(user, {
+                    includeDisabled: true,
+                })
+                code = recovered.code
+                token = recovered.token
+            } catch (error) {
+                console.warn(
+                    `[billing] Could not recover Paystack subscription for resume ${user._id}:`,
+                    error.message
+                )
+            }
+        }
+
+        if (!isPaidSubscriptionActive(user)) {
+            return res.status(400).json({
+                message:
+                    "This subscription has already ended. Choose a plan to subscribe again.",
+            })
+        }
+
+        if (sub.cancelAtPeriodEnd !== true && sub.status !== "non_renewing") {
+            return res.status(409).json({
+                message: "This subscription is already set to renew",
+                subscription: formatBillingSubscriptionResponse(user),
+            })
+        }
+
+        if (code && token) {
+            try {
+                await enablePaystackSubscription({ code, token })
+            } catch (error) {
+                console.warn(
+                    `[billing] Paystack enable failed for ${code}:`,
+                    error.message
+                )
+            }
+        }
+
+        resumePaidSubscription(user)
+        await user.save()
+        touchBillingCaches(user._id)
+
+        return res.status(200).json({
+            message: "Subscription resumed. It will renew at the end of the current period.",
             subscription: formatBillingSubscriptionResponse(user),
         })
     } catch (error) {
@@ -419,6 +742,7 @@ const clearPendingCheckout = async (userId) => {
 
     user.subscription = user.subscription ?? {}
     user.subscription.pendingPlanId = ""
+    user.subscription.pendingInterval = ""
 
     if (user.subscription.status === "pending") {
         const planId = normalizePlanId(user.subscription.planId)
@@ -429,6 +753,9 @@ const clearPendingCheckout = async (userId) => {
         user.subscription.status = hasExistingPaid ? "active" : "free"
         if (!hasExistingPaid) {
             user.subscription.planId = "free"
+        }
+        if (hasExistingPaid && user.subscription.cancelAtPeriodEnd) {
+            user.subscription.status = "non_renewing"
         }
     }
 
@@ -449,10 +776,11 @@ export const verifyBillingPayment = async (req, res) => {
         const transaction = await verifyPaystackTransaction(reference)
         const metadata = transaction.metadata ?? {}
         const userId = resolveUserIdFromMetadata(metadata)
+        const fromCode = getPlanByPaystackCode(transaction.plan)
         const planId =
-            resolvePlanIdFromMetadata(metadata) ||
-            getPlanByPaystackCode(transaction.plan)?.id ||
-            ""
+            resolvePlanIdFromMetadata(metadata) || fromCode?.id || ""
+        const interval =
+            resolveIntervalFromMetadata(metadata) || fromCode?.interval || ""
 
         if (!userId || !planId) {
             return res.status(400).json({
@@ -489,18 +817,27 @@ export const verifyBillingPayment = async (req, res) => {
             })
         }
 
+        const customerCode =
+            transaction.customer?.customer_code ||
+            transaction.customer?.code ||
+            ""
+        const paystackPlanCode =
+            transaction.plan?.plan_code || transaction.plan || ""
+
         let subscriptionPayload = null
-        if (transaction.subscription_code) {
-            try {
-                subscriptionPayload = await fetchPaystackSubscription(
-                    transaction.subscription_code
-                )
-            } catch (error) {
-                console.warn(
-                    `[billing] Could not fetch subscription ${transaction.subscription_code}:`,
-                    error.message
-                )
-            }
+        try {
+            subscriptionPayload = await resolvePaystackSubscriptionForPayment({
+                transaction,
+                subscriptionCode: transaction.subscription_code || "",
+                customerCode,
+                email: transaction.customer?.email || req.user?.email || "",
+                planCode: paystackPlanCode,
+            })
+        } catch (error) {
+            console.warn(
+                `[billing] Could not resolve Paystack subscription for ${reference}:`,
+                error.message
+            )
         }
 
         const user = await activateUserSubscription({
@@ -512,15 +849,16 @@ export const verifyBillingPayment = async (req, res) => {
                 "",
             emailToken: subscriptionPayload?.email_token || "",
             paystackPlanCode:
-                subscriptionPayload?.plan?.plan_code || transaction.plan || "",
+                subscriptionPayload?.plan_code ||
+                subscriptionPayload?.plan?.plan_code ||
+                paystackPlanCode,
             customerCode:
-                subscriptionPayload?.customer?.customer_code ||
-                transaction.customer?.customer_code ||
-                "",
+                subscriptionPayload?.customer?.customer_code || customerCode,
             status: "active",
             currentPeriodEnd: parsePaystackDate(
                 subscriptionPayload?.next_payment_date
             ),
+            interval,
         })
 
         return res.status(200).json({
@@ -528,6 +866,7 @@ export const verifyBillingPayment = async (req, res) => {
             verified: true,
             status: "success",
             subscription: formatBillingSubscriptionResponse(user),
+            plan: getPlanSummaryForUser(user),
         })
     } catch (error) {
         return handleBillingError(res, error)
@@ -634,8 +973,13 @@ export const paystackWebhook = async (req, res) => {
             if (userId) {
                 const user = await User.findById(userId)
                 if (user) {
-                    resetSubscriptionToFree(user)
+                    const periodEnd = parsePaystackDate(
+                        event?.data?.next_payment_date ||
+                            event?.data?.nextPaymentDate
+                    )
+                    applyPaystackSubscriptionStopped(user, periodEnd)
                     await user.save()
+                    touchBillingCaches(user._id)
                 }
             }
         }
@@ -648,6 +992,7 @@ export const paystackWebhook = async (req, res) => {
                     user.subscription = user.subscription ?? {}
                     user.subscription.status = "past_due"
                     await user.save()
+                    touchBillingCaches(user._id)
                 }
             }
         }

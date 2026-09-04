@@ -176,7 +176,7 @@ Admin accounts are created via backend script (`node scripts/createAdmin.js`) or
 | Approve / reject sender | `PATCH .../approve`, `PATCH .../reject` | Studio SMS display name |
 | Bulk / direct messaging | `POST /api/admin/communications/sms`, `.../email`, `.../photographers/:userId/communicate` | Email and/or SMS to photographers |
 | Comms history | `GET /api/admin/communications` | Audit log |
-| **Billing plans** | `GET/PATCH /api/admin/billing/plans/:planId` | Edit `storageLimitBytes`, `maxGalleries`, `perks`, `priceGhs` |
+| **Billing plans** | `GET/PATCH /api/admin/billing/plans/:planId` | Edit `storageLimitBytes`, `maxGalleries`, `perks`, `priceGhs`, `yearlyPriceGhs` |
 | Per-studio limit bump | `PUT /api/admin/photographers/:userId/limit-override` | Temporary storage/gallery overrides |
 | Billing events | `GET /api/admin/billing/events` | `category=paid\|failed\|dispute\|other` |
 

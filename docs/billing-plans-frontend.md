@@ -9,12 +9,12 @@ Related: [`frontend-responsibilities.md`](./frontend-responsibilities.md) · [`a
 
 ## Plan overview
 
-| Id | Name | Price (GHS / month) | Storage | Max galleries | Video storage | Support | Highlighted |
-|----|------|--------------------:|--------:|--------------:|--------------:|---------|:-----------:|
-| `free` | Free | **0** (30-day trial) | **5 GB** | **3** | — | Contact | |
-| `basic` | Basic | **40** | **25 GB** | **10** | **5 GB** | Priority | |
-| `pro` | Pro | **70** | **100 GB** | **50** | **10 GB** | Priority | ✓ Most popular |
-| `premium` | Premium | **120** | **250 GB** | **Unlimited** | **20 GB** | Premium | |
+| Id | Name | Monthly (GHS) | Yearly (GHS) | Storage | Max galleries | Video storage | Support | Highlighted |
+|----|------|--------------:|-------------:|--------:|--------------:|--------------:|---------|:-----------:|
+| `free` | Free | **0** (30-day trial) | — | **5 GB** | **3** | — | Contact | |
+| `basic` | Basic | **32** | **380** | **25 GB** | **10** | **5 GB** | Priority | |
+| `pro` | Pro | **60** | **650** | **100 GB** | **50** | **10 GB** | Priority | ✓ Most popular |
+| `premium` | Premium | **120** | **1300** | **250 GB** | **Unlimited** | **20 GB** | Premium | |
 
 Canonical ids: `free` | `basic` | `pro` | `premium`.
 
@@ -24,10 +24,11 @@ Canonical ids: `free` | `basic` | `pro` | `premium`.
 | `business` | `pro` |
 | `studio` | `premium` |
 
-Paystack env: `PAYSTACK_PLAN_BASIC` · `PAYSTACK_PLAN_PRO` · `PAYSTACK_PLAN_PREMIUM`  
+Paystack env (monthly): `PAYSTACK_PLAN_BASIC` · `PAYSTACK_PLAN_PRO` · `PAYSTACK_PLAN_PREMIUM`  
+Paystack env (yearly): `PAYSTACK_PLAN_BASIC_YEARLY` · `PAYSTACK_PLAN_PRO_YEARLY` · `PAYSTACK_PLAN_PREMIUM_YEARLY`  
 Fallbacks: `PAYSTACK_PLAN_STARTER` → basic · `PAYSTACK_PLAN_BUSINESS` → pro · `PAYSTACK_PLAN_STUDIO` → premium
 
-API responses use `priceGhs` and alias `price` (same number). Interval is `monthly` for paid plans.
+API responses use `priceGhs` (monthly, back-compat) plus `yearlyPriceGhs` and `prices.monthly` / `prices.yearly`. Checkout accepts `interval`: `monthly` | `yearly`.
 
 ---
 
@@ -37,19 +38,74 @@ API responses use `priceGhs` and alias `price` (same number). Interval is `month
 - On signup, `subscription.trialEndsAt` = now + 30 days.
 - While `trialActive`: Free features apply (3 galleries, 5 GB, core tools).
 - During the trial, clients **cannot comment on or flag images**. Photographers **cannot create sets or upload videos**.
-- After expiry with no paid plan:
-  - `trialExpired: true`
-  - all feature flags off
-  - storage limit = `0`
-  - max galleries = `0` (cannot create new galleries)
-  - must upgrade to Basic / Pro / Premium
+- After the trial date plus a **3-day grace**:
+  - `trialExpired: true` and `viewOnly: true`
+  - photographer can **view** existing work only (GET)
+  - create / update / delete return `403` `SUBSCRIPTION_VIEW_ONLY`
+  - billing checkout / verify stay allowed so they can subscribe
+  - must upgrade to Basic / Pro / Premium (monthly or yearly)
+
+During the 3-day grace (`inGracePeriod: true`) they keep trial features. Same grace applies after a paid period ends without renewal.
+
+**The trial is one-time.** Subscribing, cancelling, or switching never restarts it.
 
 | Field | Meaning |
 |-------|---------|
 | `trialDays` | `30` on Free; `null` on paid |
 | `trialEndsAt` | When the Free trial ends |
 | `trialActive` | Free plan + now &lt; `trialEndsAt` |
-| `trialExpired` | Free plan + trial no longer active |
+| `trialExpired` | Free plan + trial and 3-day grace have both ended |
+| `graceDays` | Always `3` |
+| `inGracePeriod` | Trial or paid period ended, grace still open |
+| `viewOnly` | Grace ended — photographer can view only |
+| `accessUntil` / `graceEndsAt` | Last moment of full access (period or trial end + 3 days) |
+
+---
+
+## Subscribe, switch, cancel (SaaS-style)
+
+This matches typical products (Notion, Figma, etc.): you keep what you paid for until the period ends.
+
+```
+Signup → Free 30-day trial
+              │
+              ├─ POST /api/billing/checkout { planId, interval }  → Paystack → verify
+              │         interval: "monthly" | "yearly" (default monthly)
+              │         Paid plan is live immediately
+              │
+              ├─ POST /api/billing/checkout { otherPlanId }
+              │         Switch: current plan stays on until payment succeeds,
+              │         then the new plan starts and the old Paystack sub is stopped
+              │
+              ├─ POST /api/billing/cancel
+              │         Stops renewal. Paid plan stays until currentPeriodEnd
+              │         + 3-day grace (accessUntil). After that → view-only.
+              │
+              └─ POST /api/billing/resume
+                        Undo cancel before the period ends (same plan keeps renewing)
+```
+
+| Action | What happens | Features right now |
+|--------|----------------|--------------------|
+| Subscribe from trial | Paystack charges the new plan | Paid features after verify |
+| Switch plan | New Paystack checkout; old sub disabled after success | Current paid plan until payment lands |
+| Cancel | Paystack set not to renew | **Keep paid plan until period end + 3-day grace** |
+| Resume | Re-enable Paystack renewal | Still paid; `willRenew: true` again |
+| Period ends, still in grace | `inGracePeriod: true` | Full access for 3 more days |
+| Period + grace, not renewed | `viewOnly: true` | View existing work only |
+
+Frontend flags on `GET /api/billing/subscription`:
+
+- `canCancel` — show Cancel
+- `canResume` — show Resume / Keep plan (cancel is pending)
+- `willRenew` — next charge will happen
+- `accessUntil` / `graceEndsAt` — last day of full access (period end + 3-day grace)
+- `currentPeriodEnd` / `renewalDate` — billed period end / next charge
+- `viewOnly` — lock writes; still allow GET + billing checkout
+- `interval` — `monthly` or `yearly`
+- `pendingPlanId` — checkout in progress (switch or first subscribe)
+
+Checkout of the **same** plan while cancellation is pending calls resume automatically (no extra Paystack charge).
 
 ---
 
@@ -139,13 +195,13 @@ Full frontend notes: [`public-gallery-ai-frontend.md`](./public-gallery-ai-front
 
 ---
 
-### 2. Basic (`basic`) — GHS 40 / month
+### 2. Basic (`basic`) — GHS 32 / month or GHS 380 / year
 
 **Best for:** Active studios sharing galleries by SMS and delivering video.
 
 | Limit | Value |
 |-------|------:|
-| Price | **GHS 40** / month |
+| Price | **GHS 32** / month or **GHS 380** / year |
 | Storage | 25 GB |
 | Galleries | **10** |
 | Video storage | **5 GB** |
@@ -167,13 +223,13 @@ Full frontend notes: [`public-gallery-ai-frontend.md`](./public-gallery-ai-front
 
 ---
 
-### 3. Pro (`pro`) — GHS 70 / month ★ Most popular
+### 3. Pro (`pro`) — GHS 60 / month or GHS 650 / year ★ Most popular
 
 **Best for:** Studios that want branded downloads and deeper insights.
 
 | Limit | Value |
 |-------|------:|
-| Price | **GHS 70** / month |
+| Price | **GHS 60** / month or **GHS 650** / year |
 | Storage | 100 GB |
 | Galleries | **50** |
 | Video storage | **10 GB** |
@@ -194,13 +250,13 @@ Full frontend notes: [`public-gallery-ai-frontend.md`](./public-gallery-ai-front
 
 ---
 
-### 4. Premium (`premium`) — GHS 120 / month
+### 4. Premium (`premium`) — GHS 120 / month or GHS 1300 / year
 
 **Best for:** High-volume studios that want AI-assisted selection for clients.
 
 | Limit | Value |
 |-------|------:|
-| Price | **GHS 120** / month |
+| Price | **GHS 120** / month or **GHS 1300** / year |
 | Storage | 250 GB |
 | Galleries | **Unlimited** |
 | Video storage | **20 GB** |
@@ -270,7 +326,8 @@ Do **not** hardcode “if plan === pro”. Always gate from `user.plan.features`
 | Billing settings | `GET /api/billing/subscription` | current status + features |
 | Start checkout | `GET /api/billing/config` then `POST /api/billing/checkout` | Paystack redirect |
 | After Paystack return | `GET /api/billing/verify?reference=` | then refresh `me` |
-| Cancel renewal | `POST /api/billing/cancel` | then refresh subscription |
+| Cancel renewal | `POST /api/billing/cancel` | keeps paid access until period end; then refresh `me` |
+| Resume renewal | `POST /api/billing/resume` | undo cancel before period end |
 
 ### 2. Shape you get on `user.plan`
 
@@ -308,7 +365,13 @@ type UserPlan = {
   maxGalleries: number | null // null = unlimited
   videoUploadLimitBytes: number
   videoUploadLimitLabel: string
-  priceGhs: number
+  priceGhs: number // monthly amount, or the user's current interval amount on `user.plan`
+  yearlyPriceGhs: number
+  interval: "monthly" | "yearly"
+  prices: {
+    monthly: { interval: "monthly"; priceGhs: number; available: boolean }
+    yearly: { interval: "yearly"; priceGhs: number; available: boolean }
+  }
   features: PlanFeatures
   featureKeys: string[]
   supportTier: "contact" | "priority" | "premium"
@@ -316,16 +379,28 @@ type UserPlan = {
   trialEndsAt: string | null
   trialActive: boolean
   trialExpired: boolean
+  graceDays: number // 3
+  graceEndsAt: string | null
+  inGracePeriod: boolean
+  viewOnly: boolean
   subscription: {
     status: string
+    interval: "monthly" | "yearly"
     currentPeriodEnd: string | null // same as renewalDate
     renewalDate: string | null // next Paystack renewal / period end
     upgradedAt: string | null // when the studio last moved onto this paid plan
     cancelAtPeriodEnd: boolean
     pendingPlanId: string | null
+    pendingInterval: "monthly" | "yearly" | null
+    willRenew: boolean
+    accessUntil: string | null // period or trial end + 3-day grace
     trialEndsAt: string | null
     trialActive: boolean
     trialExpired: boolean
+    graceDays: number
+    graceEndsAt: string | null
+    inGracePeriod: boolean
+    viewOnly: boolean
   }
 }
 ```
@@ -354,11 +429,11 @@ Store `user` from `/api/auth/me` in your auth store (Zustand/context/React Query
 
 ```tsx
 function AppGate({ user, children }) {
-  if (isTrialExpired(user)) {
+  if (user?.plan?.viewOnly || isTrialExpired(user)) {
     return (
       <UpgradeWall
-        title="Your free trial has ended"
-        subtitle="Upgrade to Basic, Pro, or Premium to keep creating galleries and uploading."
+        title="Your plan has ended"
+        subtitle="You can still view existing work. Subscribe to Basic, Pro, or Premium to create or change anything."
         ctaHref="/billing"
       />
     )
@@ -394,21 +469,24 @@ const { plans, comparison, featureCatalog } = await api.get("/api/billing/plans"
 
 Render checkmarks from `comparison` (includes price, storage, galleries, feature rows). Prefer `comparison` over hardcoding the matrix.
 
-Display price as **GHS** (`plan.priceGhs` / `plan.price`).
+Display both intervals: `plan.prices.monthly.priceGhs` and `plan.prices.yearly.priceGhs`. `plan.priceGhs` is the monthly amount (back-compat).
 
 ### 6. Checkout flow
 
 Paystack takes payment immediately, but the plan only flips after the backend runs **`GET /api/billing/verify`** (or a Paystack webhook). Locally, webhooks usually cannot reach `127.0.0.1`, so **verify after return (or after re-login) is required**.
 
 ```ts
-async function upgrade(planId: "basic" | "pro" | "premium") {
+async function upgrade(
+  planId: "basic" | "pro" | "premium",
+  interval: "monthly" | "yearly" = "monthly"
+) {
   const { configured } = await api.get("/api/billing/config")
   if (!configured) {
     toast.error("Billing is not available yet")
     return
   }
 
-  const { checkout } = await api.post("/api/billing/checkout", { planId })
+  const { checkout } = await api.post("/api/billing/checkout", { planId, interval })
   // Persist reference before redirect — needed if the session expires on the way back
   if (checkout.reference) {
     localStorage.setItem("paystackCheckoutReference", checkout.reference)
@@ -459,7 +537,10 @@ From `GET /api/auth/me` → `user.plan.subscription` (also on `GET /api/billing/
 
 | Field | Meaning |
 |-------|---------|
-| `renewalDate` / `currentPeriodEnd` | Next monthly renewal (from Paystack) |
+| `renewalDate` / `currentPeriodEnd` | Next monthly or yearly renewal (from Paystack) |
+| `interval` | `monthly` or `yearly` |
+| `accessUntil` / `graceEndsAt` | Last day of full access (renewal date + 3-day grace) |
+| `viewOnly` | Writes blocked; GET and billing checkout still work |
 | `upgradedAt` | When the studio last upgraded onto / switched to this paid plan |
 
 Show these on the billing settings screen after a successful upgrade.
@@ -467,7 +548,7 @@ Show these on the billing settings screen after a successful upgrade.
 **Backend also notifies the photographer (email + SMS):**
 
 1. **On plan upgrade** (verify/webhook activates a new paid plan or plan switch) — confirmation email + SMS to `studio.phone`
-2. **10 days before renewal** — reminder email + SMS (scheduler; env `BILLING_RENEWAL_REMINDER_DAYS_BEFORE`, default `10`)
+2. **5 days before renewal** (monthly or yearly) — reminder email + SMS (scheduler; env `BILLING_RENEWAL_REMINDER_DAYS_BEFORE`, default `5`)
 
 SMS requires `studio.phone` and Arkesel configured. Email uses the photographer account email.
 
@@ -642,7 +723,7 @@ GET /api/sms/config
 5. Checkout → persist Paystack `reference` → Paystack → `/billing/callback?reference=` → verify → refresh `me` (survives session expiry / re-login).
 6. Gate: comments/flags, sets, video uploads, SMS, video DASH UX, custom sender, logo watermark, advanced analytics, trash restore, Gallery AI.
 7. Enforce gallery/storage/video limits in create/upload CTAs.
-8. Map `PLAN_FEATURE_REQUIRED` / `GALLERY_LIMIT_REACHED` / `VIDEO_LIMIT_REACHED` to upgrade UI.
+8. Map `PLAN_FEATURE_REQUIRED` / `GALLERY_LIMIT_REACHED` / `VIDEO_LIMIT_REACHED` / `SUBSCRIPTION_VIEW_ONLY` to upgrade UI. When `viewOnly` is true, keep list/detail screens readable and send all create/edit actions to billing.
 
 **Storage meters (`GET /api/storage`):** `summary.usedBytes` is **photos/finals only** (plan pool). `summary.videoUsedBytes` + `summary.videoUploadLimitBytes` are the separate video pool. Refresh storage after uploads so the video bar fills.
 
@@ -652,9 +733,10 @@ GET /api/sms/config
 
 ```
 GET  /api/billing/config
-POST /api/billing/checkout   { "planId": "basic" | "pro" | "premium" }
+POST /api/billing/checkout   { "planId": "basic" | "pro" | "premium", "interval": "monthly" | "yearly" }
 GET  /api/billing/verify?reference=
 POST /api/billing/cancel
+POST /api/billing/resume
 GET  /api/billing/subscription
 GET  /api/billing/plans
 ```
@@ -669,6 +751,9 @@ APP_URL=https://your-app.example.com
 PAYSTACK_PLAN_BASIC=
 PAYSTACK_PLAN_PRO=
 PAYSTACK_PLAN_PREMIUM=
+PAYSTACK_PLAN_BASIC_YEARLY=
+PAYSTACK_PLAN_PRO_YEARLY=
+PAYSTACK_PLAN_PREMIUM_YEARLY=
 ```
 
 Paystack dashboard webhook: `POST https://YOUR_API/api/billing/webhook` (needed in prod; local tunnels rarely receive these).

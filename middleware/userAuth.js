@@ -7,15 +7,21 @@ import {
     isEmailVerified,
 } from "../utils/emailVerification.js"
 import { touchUserActivity } from "../utils/userSessions.js"
-import { cacheGetOrSet } from "../utils/memoryCache.js"
+import { cacheGetOrSet, cacheDeletePrefix } from "../utils/memoryCache.js"
 import {
     findActiveApiTokenBySecret,
     isApiTokenString,
     touchApiTokenUsage,
 } from "../utils/apiTokens.js"
 import { loadActiveStudioMembership } from "../utils/studioContext.js"
+import { enforceViewOnlyWrites } from "./requireWriteAccess.js"
 
 const AUTH_CACHE_TTL_MS = Number(process.env.AUTH_CACHE_TTL_MS ?? 60_000)
+
+export const invalidateAuthUserCache = (userId) => {
+    if (!userId) return
+    cacheDeletePrefix(`auth:user:${String(userId)}:`)
+}
 
 const loadActiveUser = async (userId, tokenVersion) => {
     const cacheKey = `auth:user:${userId}:${tokenVersion}`
@@ -90,7 +96,7 @@ export const protectUser = async (req, res, next) => {
             touchApiTokenUsage(apiToken).catch(() => {})
             await attachStudioContext(req, user)
             req.authVia = "api_token"
-            return next()
+            return enforceViewOnlyWrites(req, res, next)
         }
 
         let decoded
@@ -138,7 +144,7 @@ export const protectUser = async (req, res, next) => {
         touchUserActivity(userId, decoded.sid ?? null).catch(() => {})
 
         await attachStudioContext(req, User.hydrate(user))
-        next()
+        return enforceViewOnlyWrites(req, res, next)
     } catch (err) {
         console.error("[auth] protectUser error:", err)
         return res.status(401).json({ message: "Not authorized, token invalid" })

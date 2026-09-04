@@ -78,6 +78,7 @@ const bookingSchema = new mongoose.Schema(
 )
 
 bookingSchema.index({ owner: 1, startsAt: 1 })
+bookingSchema.index({ owner: 1, updatedAt: -1 })
 bookingSchema.index({ owner: 1, category: 1, startsAt: 1 })
 bookingSchema.index({ startsAt: 1, dayReminderEmailSentAt: 1 })
 bookingSchema.index({ startsAt: 1, hourReminderEmailSentAt: 1 })

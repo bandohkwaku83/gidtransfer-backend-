@@ -392,7 +392,9 @@ gallerySchema.pre("save", function normalizeGalleryDesignFields() {
 })
 
 gallerySchema.index({ owner: 1, deletedAt: 1, createdAt: -1 })
+gallerySchema.index({ owner: 1, deletedAt: 1, updatedAt: -1 })
 gallerySchema.index({ owner: 1, status: 1, deletedAt: 1 })
+gallerySchema.index({ owner: 1, updatedAt: -1 })
 gallerySchema.index(
     { owner: 1, slug: 1 },
     {

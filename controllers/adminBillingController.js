@@ -43,7 +43,10 @@ const formatPlanAdmin = (plan) => ({
     aliases: plan.aliases ?? [],
     priceGhs: plan.priceGhs,
     price: plan.priceGhs,
+    yearlyPriceGhs: plan.yearlyPriceGhs ?? 0,
     interval: plan.interval,
+    prices: plan.prices,
+    graceDays: plan.graceDays,
     trialDays: plan.trialDays ?? null,
     paystackPlanCode: plan.paystackPlanCode ?? null,
     available:
@@ -129,6 +132,16 @@ export const updateAdminPlan = async (req, res) => {
             patch.priceGhs = Math.round(n * 100) / 100
         }
 
+        if (req.body?.yearlyPriceGhs !== undefined) {
+            const n = Number(req.body.yearlyPriceGhs)
+            if (!Number.isFinite(n) || n < 0) {
+                return res.status(400).json({
+                    message: "yearlyPriceGhs must be a non-negative number",
+                })
+            }
+            patch.yearlyPriceGhs = Math.round(n * 100) / 100
+        }
+
         if (req.body?.perks !== undefined) {
             if (!Array.isArray(req.body.perks)) {
                 return res.status(400).json({ message: "perks must be an array of strings" })
@@ -190,7 +203,7 @@ export const updateAdminPlan = async (req, res) => {
         if (!Object.keys(patch).length) {
             return res.status(400).json({
                 message:
-                    "Provide at least one of name, description, storageLimitBytes, maxGalleries, maxTeamMembers, videoUploadLimitBytes, priceGhs, perks, featureKeys, supportTier",
+                    "Provide at least one of name, description, storageLimitBytes, maxGalleries, maxTeamMembers, videoUploadLimitBytes, priceGhs, yearlyPriceGhs, perks, featureKeys, supportTier",
             })
         }
 

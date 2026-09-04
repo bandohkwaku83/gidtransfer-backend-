@@ -12,8 +12,8 @@ const checkIntervalHours = () => {
 const checkIntervalMs = () => checkIntervalHours() * MS_HOUR
 
 const reminderDaysBefore = () => {
-    const raw = Number(process.env.BILLING_RENEWAL_REMINDER_DAYS_BEFORE ?? 10)
-    return Number.isFinite(raw) && raw > 0 ? raw : 10
+    const raw = Number(process.env.BILLING_RENEWAL_REMINDER_DAYS_BEFORE ?? 5)
+    return Number.isFinite(raw) && raw > 0 ? raw : 5
 }
 
 /** Half the poll interval, at least 3 hours — avoids missing the window. */
@@ -32,7 +32,8 @@ const buildDueRenewalQuery = (now) => {
     return {
         isActive: true,
         "subscription.planId": { $nin: ["free", null, ""] },
-        "subscription.status": { $in: ["active", "non_renewing"] },
+        "subscription.status": "active",
+        "subscription.cancelAtPeriodEnd": { $ne: true },
         "subscription.currentPeriodEnd": {
             $gte: new Date(now.getTime() + leadMs - tolerance),
             $lte: new Date(now.getTime() + leadMs + tolerance),
@@ -40,7 +41,7 @@ const buildDueRenewalQuery = (now) => {
     }
 }
 
-/** Email + SMS when a paid plan is ~10 days from renewal / period end. */
+/** Email + SMS when a paid plan is ~5 days from renewal / period end. */
 export const sendDueSubscriptionRenewalReminders = async () => {
     const now = new Date()
     const daysLeft = reminderDaysBefore()

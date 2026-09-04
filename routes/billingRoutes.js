@@ -5,6 +5,7 @@ import {
     getBillingConfig,
     getBillingSubscription,
     listBillingPlans,
+    resumeBillingSubscription,
     verifyBillingPayment,
 } from "../controllers/billingController.js"
 import { protectUser } from "../middleware/userAuth.js"
@@ -20,6 +21,7 @@ router.get("/plans", listBillingPlans)
 router.get("/subscription", getBillingSubscription)
 router.post("/checkout", checkoutBillingPlan)
 router.post("/cancel", cancelBillingSubscription)
+router.post("/resume", resumeBillingSubscription)
 router.get("/verify", verifyBillingPayment)
 router.post("/verify", verifyBillingPayment)
 

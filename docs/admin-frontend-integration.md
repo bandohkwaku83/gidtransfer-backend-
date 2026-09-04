@@ -823,7 +823,7 @@ History list of past sends (`items` + `pagination`).
 
 ## Billing admin
 
-Plans: **`free` (30-day trial, 3 galleries, no comments/sets/video) | `basic` (GHS 40, 10 galleries, 5 GB video) | `pro` (GHS 70, 50 galleries, 10 GB video, most popular) | `premium` (GHS 120, unlimited galleries, 20 GB video)**.  
+Plans: **`free` (30-day trial + 3-day grace, 3 galleries, no comments/sets/video) | `basic` (GHS 32/mo or 380/yr) | `pro` (GHS 60/mo or 650/yr) | `premium` (GHS 120/mo or 1300/yr)**. After grace, photographers are view-only until they renew.  
 Aliases on write: `starter` → `basic`, `business` → `pro`, `studio` → `premium`.  
 API field `storageLimitBytes` (alias on write: `storageBytes`). Responses also echo `storageBytes` / `price` for UI convenience.  
 Each plan includes `features` (boolean map), `featureKeys`, `supportTier`, and marketing `perks`. Photographer app: [`billing-plans-frontend.md`](./billing-plans-frontend.md).
@@ -868,6 +868,7 @@ Each plan includes `features` (boolean map), `featureKeys`, `supportTier`, and m
       "maxGalleries": null,
       "price": 120,
       "priceGhs": 120,
+      "yearlyPriceGhs": 1300,
       "interval": "monthly",
       "trialDays": null,
       "perks": [

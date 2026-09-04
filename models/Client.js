@@ -34,6 +34,7 @@ const clientSchema = new mongoose.Schema(
 )
 
 clientSchema.index({ owner: 1, createdAt: -1 })
+clientSchema.index({ owner: 1, updatedAt: -1 })
 clientSchema.index({ name: "text", email: "text", phone: "text", location: "text" })
 
 const Client = mongoose.model("Client", clientSchema)

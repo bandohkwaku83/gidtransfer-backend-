@@ -39,6 +39,11 @@ const planConfigSchema = new mongoose.Schema(
             default: null,
             min: 0,
         },
+        yearlyPriceGhs: {
+            type: Number,
+            default: null,
+            min: 0,
+        },
         perks: {
             type: [String],
             default: undefined,

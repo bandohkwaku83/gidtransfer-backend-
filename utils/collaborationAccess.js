@@ -66,6 +66,36 @@ export const countWorkspaceSeats = async (workspaceId) =>
         status: { $in: ["invited", "active"] },
     })
 
+/** Batched active+invited seat counts for many workspaces (single aggregation). */
+export const countWorkspaceSeatsBulk = async (workspaceIds) => {
+    if (!Array.isArray(workspaceIds) || workspaceIds.length === 0) return new Map()
+    const rows = await CollaborationMember.aggregate([
+        {
+            $match: {
+                workspace: { $in: workspaceIds },
+                status: { $in: ["invited", "active"] },
+            },
+        },
+        { $group: { _id: "$workspace", count: { $sum: 1 } } },
+    ])
+    return new Map(rows.map((r) => [String(r._id), r.count]))
+}
+
+/** Batched membership lookup for a caller across many workspaces. */
+export const memberRolesForWorkspaces = async (userId, workspaceIds) => {
+    if (!userId || !Array.isArray(workspaceIds) || workspaceIds.length === 0) {
+        return new Map()
+    }
+    const rows = await CollaborationMember.find({
+        user: userId,
+        status: "active",
+        workspace: { $in: workspaceIds },
+    })
+        .select("workspace role")
+        .lean()
+    return new Map(rows.map((r) => [String(r.workspace), r.role]))
+}
+
 export const seatLimitReached = async (ownerUser, workspaceId) => {
     const max = getEffectiveMaxTeamMembers(ownerUser)
     if (max == null) return false

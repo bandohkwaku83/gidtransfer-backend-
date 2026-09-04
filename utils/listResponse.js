@@ -4,7 +4,7 @@ import { pickFields, parseFieldsQuery } from "./sparseFields.js"
 
 export const ownerSyncHeaders = (revision) => ({
     "X-Sync-Revision": revision,
-    "X-API-Latency-Budget-Ms": String(process.env.SLOW_REQUEST_MS ?? 200),
+    "X-API-Latency-Budget-Ms": String(process.env.SLOW_REQUEST_MS ?? 800),
 })
 
 export const sendOwnerJson = async (

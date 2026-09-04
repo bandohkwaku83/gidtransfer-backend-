@@ -176,6 +176,14 @@ app.use(
             if (req.headers["x-no-compression"]) return false
             const pathname = (req.originalUrl || req.url || "").split("?")[0]
             if (pathname.startsWith("/uploads/")) return false
+            /** Never compress SSE streams — the client needs immediate flushes. */
+            const contentType = res.getHeader("Content-Type")
+            if (
+                typeof contentType === "string" &&
+                contentType.startsWith("text/event-stream")
+            ) {
+                return false
+            }
             return compression.filter(req, res)
         },
     })
@@ -331,7 +339,7 @@ app.get("/api", (_req, res) => {
                 billing: {
                     plans: "GET /api/admin/billing/plans",
                     updatePlan:
-                        "PATCH /api/admin/billing/plans/:planId (JSON: storageLimitBytes|storageBytes, maxGalleries, maxTeamMembers, perks, featureKeys, supportTier, priceGhs, name, description, reason)",
+                        "PATCH /api/admin/billing/plans/:planId (JSON: storageLimitBytes|storageBytes, maxGalleries, maxTeamMembers, perks, featureKeys, supportTier, priceGhs, yearlyPriceGhs, name, description, reason)",
                     limitOverride:
                         "PUT /api/admin/photographers/:userId/limit-override (JSON: storageLimitBytes, maxGalleries, expiresAt|expiresInDays, reason | clear:true)",
                     events:
@@ -394,8 +402,12 @@ app.get("/api", (_req, res) => {
                 config: "GET /api/billing/config",
                 plans: "GET /api/billing/plans (includes featureCatalog + comparison)",
                 subscription: "GET /api/billing/subscription",
-                checkout: "POST /api/billing/checkout (JSON: planId)",
-                cancel: "POST /api/billing/cancel",
+                checkout:
+                    "POST /api/billing/checkout (JSON: planId, interval monthly|yearly)",
+                cancel:
+                    "POST /api/billing/cancel (keeps paid access until period end + 3-day grace)",
+                resume:
+                    "POST /api/billing/resume (undo cancel before the period ends)",
                 verify:
                     "GET|POST /api/billing/verify?reference= (after Paystack redirect)",
                 webhook: "POST /api/billing/webhook (Paystack — raw JSON body)",
@@ -596,7 +608,16 @@ app.use((_req, res) => {
 
 app.use((err, _req, res, _next) => {
     console.error(err)
+    if (res.headersSent) return
     res.status(500).json({ message: "Server error" })
+})
+
+process.on("unhandledRejection", (reason) => {
+    console.error("[process] unhandledRejection:", reason)
+})
+
+process.on("uncaughtException", (err) => {
+    console.error("[process] uncaughtException:", err)
 })
 
 const PORT = process.env.PORT || 7100
@@ -626,14 +647,32 @@ mongoose
             await backfillGalleryMediaSortOrders()
             await initAccountIdCounter()
             await Gallery.syncIndexes()
-            const { default: GalleryAccessEmail } = await import(
-                "./models/GalleryAccessEmail.js"
-            )
-            await GalleryAccessEmail.syncIndexes()
-            const { default: User } = await import("./models/User.js")
-            await User.syncIndexes()
-            const { default: Booking } = await import("./models/Booking.js")
-            await Booking.syncIndexes()
+            const [
+                { default: GalleryAccessEmail },
+                { default: User },
+                { default: Booking },
+                { default: Client },
+                { default: Income },
+                { default: GalleryPhoto },
+                { default: GalleryFinal },
+            ] = await Promise.all([
+                import("./models/GalleryAccessEmail.js"),
+                import("./models/User.js"),
+                import("./models/Booking.js"),
+                import("./models/Client.js"),
+                import("./models/Income.js"),
+                import("./models/GalleryPhoto.js"),
+                import("./models/GalleryFinal.js"),
+            ])
+            await Promise.all([
+                GalleryAccessEmail.syncIndexes(),
+                User.syncIndexes(),
+                Booking.syncIndexes(),
+                Client.syncIndexes(),
+                Income.syncIndexes(),
+                GalleryPhoto.syncIndexes(),
+                GalleryFinal.syncIndexes(),
+            ])
             const { default: PlanConfig } = await import("./models/PlanConfig.js")
             const { loadPlanCatalogOverridesFromDb } = await import(
                 "./utils/planCatalog.js"
@@ -708,9 +747,34 @@ mongoose
         startBookingReminderScheduler()
         startSubscriptionRenewalReminderScheduler()
 
-        app.listen(PORT, () => {
+        const server = app.listen(PORT, () => {
             console.log(`Photo Global Admin API listening on port ${PORT}`)
         })
+
+        let shuttingDown = false
+        const shutdown = async (signal) => {
+            if (shuttingDown) return
+            shuttingDown = true
+            console.log(`[shutdown] Received ${signal}, closing gracefully…`)
+            const forceExitTimer = setTimeout(() => {
+                console.warn("[shutdown] Force-exit after 10s")
+                process.exit(1)
+            }, 10_000)
+            forceExitTimer.unref?.()
+
+            try {
+                await new Promise((resolve) => server.close(() => resolve()))
+                await mongoose.connection.close(false)
+                console.log("[shutdown] Clean exit")
+                process.exit(0)
+            } catch (err) {
+                console.error("[shutdown] Error while closing:", err)
+                process.exit(1)
+            }
+        }
+
+        process.on("SIGTERM", () => shutdown("SIGTERM"))
+        process.on("SIGINT", () => shutdown("SIGINT"))
     })
     .catch((error) => {
         console.error(error)

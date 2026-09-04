@@ -3,9 +3,19 @@ import { subscribeOwnerEvents } from "../utils/realtimeHub.js"
 
 const HEARTBEAT_MS = Number(process.env.SSE_HEARTBEAT_MS ?? 25_000)
 
+const safeWrite = (res, chunk) => {
+    try {
+        if (res.writableEnded || res.destroyed) return false
+        res.write(chunk)
+        return true
+    } catch {
+        return false
+    }
+}
+
 const writeSse = (res, event, data) => {
-    res.write(`event: ${event}\n`)
-    res.write(`data: ${JSON.stringify(data)}\n\n`)
+    if (!safeWrite(res, `event: ${event}\n`)) return
+    safeWrite(res, `data: ${JSON.stringify(data)}\n\n`)
 }
 
 export const streamOwnerEvents = async (req, res) => {
@@ -28,13 +38,16 @@ export const streamOwnerEvents = async (req, res) => {
         })
 
         const heartbeat = setInterval(() => {
-            res.write(": ping\n\n")
+            safeWrite(res, ": ping\n\n")
         }, HEARTBEAT_MS)
 
-        req.on("close", () => {
+        const cleanup = () => {
             clearInterval(heartbeat)
             unsubscribe()
-        })
+        }
+
+        req.on("close", cleanup)
+        req.on("aborted", cleanup)
     } catch (error) {
         console.error("streamOwnerEvents:", error)
         if (!res.headersSent) {

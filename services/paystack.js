@@ -141,8 +141,88 @@ export const fetchPaystackSubscription = async (subscriptionCodeOrId) =>
         `/subscription/${encodeURIComponent(subscriptionCodeOrId)}`
     )
 
+export const listPaystackSubscriptions = async ({
+    customer,
+    plan,
+    page = 1,
+    perPage = 50,
+} = {}) => {
+    const params = new URLSearchParams({
+        page: String(page),
+        perPage: String(perPage),
+    })
+    if (customer) params.set("customer", String(customer).trim())
+    if (plan) params.set("plan", String(plan).trim())
+    const data = await paystackRequest("GET", `/subscription?${params}`)
+    return Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []
+}
+
+const resolveCustomerCode = async ({ customerCode, email }) => {
+    const existing = String(customerCode ?? "").trim()
+    if (existing) return existing
+    const address = String(email ?? "").trim()
+    if (!address) return ""
+    try {
+        const customer = await fetchPaystackCustomer(address)
+        return customer?.customer_code || customer?.code || ""
+    } catch {
+        return ""
+    }
+}
+
+/** Latest matching Paystack subscription. */
+export const findPaystackSubscription = async ({
+    customerCode,
+    email,
+    planCode,
+    includeDisabled = false,
+} = {}) => {
+    const customer = await resolveCustomerCode({ customerCode, email })
+    if (!customer) return null
+
+    const wantedPlan = String(planCode ?? "").trim()
+    let rows = await listPaystackSubscriptions({
+        customer,
+        plan: wantedPlan || undefined,
+    })
+    if (!rows.length && wantedPlan) {
+        rows = await listPaystackSubscriptions({ customer })
+    }
+
+    const ranked = rows
+        .filter((row) => {
+            const status = String(row?.status ?? "").toLowerCase()
+            if (!includeDisabled && (status === "cancelled" || status === "complete")) {
+                return false
+            }
+            if (!wantedPlan) return true
+            const rowPlan =
+                row?.plan?.plan_code || row?.plan_code || row?.plan || ""
+            return String(rowPlan).trim() === wantedPlan
+        })
+        .sort((a, b) => {
+            const rank = (row) => {
+                const status = String(row?.status ?? "").toLowerCase()
+                if (status === "active") return 0
+                if (status === "non-renewing" || status === "non_renewing") return 1
+                if (status === "attention") return 2
+                return 3
+            }
+            return rank(a) - rank(b)
+        })
+
+    return ranked[0] ?? null
+}
+
 export const disablePaystackSubscription = async ({ code, token }) =>
     paystackRequest("POST", "/subscription/disable", {
+        code,
+        token,
+    })
+
+/** Re-enable a subscription that was set not to renew / disabled. */
+export const enablePaystackSubscription = async ({ code, token }) =>
+    paystackRequest("POST", "/subscription/enable", {
         code,
         token,
     })

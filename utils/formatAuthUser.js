@@ -6,12 +6,22 @@ import { formatUserResponse } from "./formatUserResponse.js"
 
 /**
  * Shape login / me payloads for owners and studio staff.
+ *
+ * When `req` is present, we assume `protectUser` has already resolved
+ * (`req.actor`, `req.user`, `req.membership`, `req.studioOwnerId`). We use
+ * that context directly instead of re-querying the studio membership.
+ *
  * @param {object} actorUser - the logged-in account
- * @param {object} [req] - optional express req with membership already attached
+ * @param {object} [req] - optional express req populated by `protectUser`
  */
 export const formatAuthUserPayload = async (actorUser, req = null) => {
-    if (req?.membership && req?.user && req?.actor) {
-        return formatUserResponse(req.actor, {
+    if (req && Object.prototype.hasOwnProperty.call(req, "membership")) {
+        if (!req.membership) {
+            return formatUserResponse(req.actor ?? actorUser, {
+                accountType: "owner",
+            })
+        }
+        return formatUserResponse(req.actor ?? actorUser, {
             planFrom: req.user,
             studioFrom: req.user,
             accountType: "member",

@@ -570,18 +570,19 @@ export const planUpgradedEmail = ({
     studioName,
     planName,
     priceGhs,
+    interval = "month",
     renewalDateLabel,
     upgradedAtLabel,
     actionUrl,
 }) => {
+    const priceLabel =
+        priceGhs != null ? `GHS ${priceGhs}/${interval}` : null
     const title = `You're on the ${planName} plan`
     const bodyHtml = `
       ${introLine(studioName, "your studio plan is active. Here are the details:")}
       ${detailCard([
           { label: "Plan", value: planName },
-          ...(priceGhs != null
-              ? [{ label: "Price", value: `GHS ${priceGhs}/month` }]
-              : []),
+          ...(priceLabel ? [{ label: "Price", value: priceLabel }] : []),
           ...(upgradedAtLabel
               ? [{ label: "Upgraded", value: upgradedAtLabel }]
               : []),
@@ -602,7 +603,7 @@ export const planUpgradedEmail = ({
             ctaLabel: actionUrl ? "Open billing" : undefined,
             ctaUrl: actionUrl,
         }),
-        text: `You're on the ${planName} plan.${priceGhs != null ? `\nPrice: GHS ${priceGhs}/month` : ""}${upgradedAtLabel ? `\nUpgraded: ${upgradedAtLabel}` : ""}${renewalDateLabel ? `\nNext renewal: ${renewalDateLabel}` : ""}${actionUrl ? `\nBilling: ${actionUrl}` : ""}`,
+        text: `You're on the ${planName} plan.${priceLabel ? `\nPrice: ${priceLabel}` : ""}${upgradedAtLabel ? `\nUpgraded: ${upgradedAtLabel}` : ""}${renewalDateLabel ? `\nNext renewal: ${renewalDateLabel}` : ""}${actionUrl ? `\nBilling: ${actionUrl}` : ""}`,
     }
 }
 
@@ -610,8 +611,9 @@ export const planRenewalReminderEmail = ({
     studioName,
     planName,
     priceGhs,
+    interval = "month",
     renewalDateLabel,
-    daysLeft = 10,
+    daysLeft = 5,
     actionUrl,
 }) => {
     const title = `${planName} renews in ${daysLeft} days`

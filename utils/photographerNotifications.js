@@ -218,6 +218,7 @@ export const notifyPhotographerPlanUpgraded = async ({
     ownerId,
     planName,
     priceGhs,
+    interval = "month",
     renewalDateLabel,
     upgradedAtLabel,
 }) => {
@@ -228,6 +229,7 @@ export const notifyPhotographerPlanUpgraded = async ({
         studioName,
         planName,
         priceGhs,
+        interval,
         renewalDateLabel,
         upgradedAtLabel,
         actionUrl: billingUrl(companySlug),
@@ -241,8 +243,9 @@ export const notifyPhotographerPlanRenewalReminder = async ({
     ownerId,
     planName,
     priceGhs,
+    interval = "month",
     renewalDateLabel,
-    daysLeft = 10,
+    daysLeft = 5,
 }) => {
     const user = preloadedUser ?? (await loadPhotographer(ownerId))
     const companySlug = user?.studio?.companySlug
@@ -251,6 +254,7 @@ export const notifyPhotographerPlanRenewalReminder = async ({
         studioName,
         planName,
         priceGhs,
+        interval,
         renewalDateLabel,
         daysLeft,
         actionUrl: billingUrl(companySlug),

@@ -175,6 +175,12 @@ const subscriptionSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+        /** monthly | yearly — which Paystack plan they subscribed to. */
+        interval: {
+            type: String,
+            enum: ["", "monthly", "yearly"],
+            default: "",
+        },
         cancelAtPeriodEnd: {
             type: Boolean,
             default: false,
@@ -185,7 +191,12 @@ const subscriptionSchema = new mongoose.Schema(
             trim: true,
             default: "",
         },
-        /** Period-end we already sent the 10-day renewal reminder for (dedupe). */
+        pendingInterval: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+        /** Period-end we already sent the 5-day renewal reminder for (dedupe). */
         renewalReminderPeriodEnd: {
             type: Date,
             default: null,

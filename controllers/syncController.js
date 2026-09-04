@@ -54,7 +54,7 @@ const ALLOWED_BATCH_KEYS = new Set([
 
 const syncHeaders = (revision) => ({
     "X-Sync-Revision": revision,
-    "X-API-Latency-Budget-Ms": String(process.env.SLOW_REQUEST_MS ?? 200),
+    "X-API-Latency-Budget-Ms": String(process.env.SLOW_REQUEST_MS ?? 800),
 })
 
 export const getSyncRevision = async (req, res) => {

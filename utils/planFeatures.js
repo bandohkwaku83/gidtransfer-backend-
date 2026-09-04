@@ -2,11 +2,23 @@ import { formatBytesLabel } from "./storageFields.js"
 import {
     getAllPlans,
     getPlanById,
+    getAccessUntil,
+    getTrialAccessEndsAt,
     getTrialEndsAt,
     getUserPlanId,
     isFreeTrialActive,
     isFreeTrialExpired,
+    isFreeTrialInGrace,
+    isInGracePeriod,
+    isViewOnlyLocked,
+    SUBSCRIPTION_GRACE_DAYS,
 } from "./planCatalog.js"
+import { cacheGetOrSet, cacheDeletePrefix } from "./memoryCache.js"
+
+const OWNER_FEATURE_CACHE_TTL_MS = Math.max(
+    0,
+    Number(process.env.OWNER_FEATURE_CACHE_TTL_MS ?? 30_000)
+)
 
 /**
  * Entitlement keys that map to real product surfaces.
@@ -229,8 +241,13 @@ export const getPlanFeatureKeys = (planOrId, { user = null } = {}) => {
     const keys = Array.isArray(plan?.featureKeys) ? plan.featureKeys : []
     const known = keys.filter((key) => FEATURE_KEY_SET.has(key))
 
-    // Free plan only grants features while the 30-day trial is active.
-    if (plan?.id === "free" && user && !isFreeTrialActive(user)) {
+    // Free plan grants features during the 30-day trial and the 3-day grace.
+    if (
+        plan?.id === "free" &&
+        user &&
+        !isFreeTrialActive(user) &&
+        !isFreeTrialInGrace(user)
+    ) {
         return []
     }
 
@@ -259,6 +276,9 @@ export const getUserEntitlements = (user) => {
     const trialEndsAt = getTrialEndsAt(user)
     const trialActive = isFreeTrialActive(user)
     const trialExpired = isFreeTrialExpired(user)
+    const inGracePeriod = isInGracePeriod(user)
+    const viewOnly = isViewOnlyLocked(user)
+    const graceEndsAt = getAccessUntil(user)
 
     let supportTier = SUPPORT_TIERS.contact
     if (plan.id === "premium") supportTier = SUPPORT_TIERS.premium
@@ -277,6 +297,11 @@ export const getUserEntitlements = (user) => {
         trialEndsAt,
         trialActive,
         trialExpired,
+        trialGraceEndsAt: getTrialAccessEndsAt(user),
+        graceDays: SUBSCRIPTION_GRACE_DAYS,
+        graceEndsAt,
+        inGracePeriod,
+        viewOnly,
     }
 }
 
@@ -312,11 +337,33 @@ export const featureDeniedPayload = (featureKey, { user } = {}) => {
         requiredPlans: requiredPlans.map((plan) => plan.id),
         currentPlanId: user ? getUserPlanId(user) : null,
         trialExpired: user ? isFreeTrialExpired(user) : false,
+        viewOnly: user ? isViewOnlyLocked(user) : false,
+        inGracePeriod: user ? isInGracePeriod(user) : false,
+        graceEndsAt: user ? getAccessUntil(user) : null,
     }
 }
 
 export const sendFeatureDenied = (res, featureKey, { user } = {}) =>
     res.status(403).json(featureDeniedPayload(featureKey, { user }))
+
+export const viewOnlyDeniedPayload = (user) => {
+    const trialExpired = user ? isFreeTrialExpired(user) : false
+    return {
+        message: trialExpired
+            ? "Your free trial has ended. You can view existing work, but subscribe to create or change anything."
+            : "Your subscription has ended. You can view existing work, but renew to create or change anything.",
+        code: "SUBSCRIPTION_VIEW_ONLY",
+        viewOnly: true,
+        trialExpired,
+        inGracePeriod: false,
+        graceDays: SUBSCRIPTION_GRACE_DAYS,
+        graceEndsAt: user ? getAccessUntil(user) : null,
+        currentPlanId: user ? getUserPlanId(user) : null,
+    }
+}
+
+export const sendViewOnlyDenied = (res, user) =>
+    res.status(403).json(viewOnlyDeniedPayload(user))
 
 export const formatFeatureCatalog = () =>
     FEATURE_CATALOG.map((item) => ({
@@ -357,6 +404,19 @@ export const formatPlanComparison = () => {
                     plan.id === "free"
                         ? "GHS 0 / 30-day trial"
                         : `GHS ${Number(plan.priceGhs)} / month`,
+                ])
+            ),
+        },
+        {
+            key: "yearlyPriceGhs",
+            label: "Yearly price",
+            category: "limits",
+            values: Object.fromEntries(
+                plans.map((plan) => [
+                    plan.id,
+                    plan.id === "free"
+                        ? "—"
+                        : `GHS ${Number(plan.yearlyPriceGhs)} / year`,
                 ])
             ),
         },
@@ -415,10 +475,30 @@ export const formatPlanComparison = () => {
     return rows
 }
 
-/** Owner lookup for public / background jobs. */
+const loadOwnerForFeatures = async (ownerId) => {
+    const { default: User } = await import("../models/User.js")
+    return User.findById(ownerId).select("subscription createdAt").lean()
+}
+
+/** Owner lookup for public / background jobs, cached briefly to avoid churn. */
 export const ownerHasFeature = async (ownerId, featureKey) => {
     if (!ownerId) return false
-    const { default: User } = await import("../models/User.js")
-    const user = await User.findById(ownerId).select("subscription createdAt").lean()
+    const key = String(ownerId)
+    if (OWNER_FEATURE_CACHE_TTL_MS <= 0) {
+        const user = await loadOwnerForFeatures(ownerId)
+        return userHasFeature(user, featureKey)
+    }
+
+    const user = await cacheGetOrSet(
+        `planFeatures:owner:${key}`,
+        () => loadOwnerForFeatures(ownerId),
+        OWNER_FEATURE_CACHE_TTL_MS
+    )
     return userHasFeature(user, featureKey)
+}
+
+/** Invalidate cached owner features (call after subscription changes). */
+export const invalidateOwnerFeatureCache = (ownerId) => {
+    if (!ownerId) return
+    cacheDeletePrefix(`planFeatures:owner:${String(ownerId)}`)
 }

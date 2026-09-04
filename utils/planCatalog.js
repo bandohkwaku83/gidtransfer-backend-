@@ -4,8 +4,24 @@ export const FREE_PLAN_LIMIT_BYTES = 5 * 1024 * 1024 * 1024
 /** Free plan length before upgrade is required. */
 export const FREE_TRIAL_DAYS = 30
 
+/**
+ * After the billed period or trial ends, the photographer keeps full access
+ * for this many days. After that they can only view existing work.
+ */
+export const SUBSCRIPTION_GRACE_DAYS = 3
+
 const GIB = 1024 * 1024 * 1024
 const DAY_MS = 24 * 60 * 60 * 1000
+
+export const BILLING_INTERVALS = {
+    monthly: "monthly",
+    yearly: "yearly",
+}
+
+const PAYSTACK_INTERVAL_BY_OURS = {
+    monthly: "monthly",
+    yearly: "annually",
+}
 
 /**
  * Checkout / lookup aliases.
@@ -72,6 +88,7 @@ const planDefinitions = [
         maxGalleries: 3,
         maxTeamMembers: 0,
         priceGhs: 0,
+        yearlyPriceGhs: 0,
         interval: "monthly",
         trialDays: FREE_TRIAL_DAYS,
         paystackPlanCodeEnv: null,
@@ -98,11 +115,13 @@ const planDefinitions = [
         storageLimitBytes: 25 * GIB,
         maxGalleries: 10,
         maxTeamMembers: 0,
-        priceGhs: 40,
+        priceGhs: 32,
+        yearlyPriceGhs: 380,
         interval: "monthly",
         trialDays: null,
         paystackPlanCodeEnv: "PAYSTACK_PLAN_BASIC",
         paystackPlanCodeEnvFallbacks: ["PAYSTACK_PLAN_STARTER"],
+        paystackYearlyPlanCodeEnv: "PAYSTACK_PLAN_BASIC_YEARLY",
         highlighted: false,
         aliases: ["starter"],
         videoUploadLimitBytes: 5 * GIB,
@@ -128,11 +147,13 @@ const planDefinitions = [
         storageLimitBytes: 100 * GIB,
         maxGalleries: 50,
         maxTeamMembers: 0,
-        priceGhs: 70,
+        priceGhs: 60,
+        yearlyPriceGhs: 650,
         interval: "monthly",
         trialDays: null,
         paystackPlanCodeEnv: "PAYSTACK_PLAN_PRO",
         paystackPlanCodeEnvFallbacks: ["PAYSTACK_PLAN_BUSINESS"],
+        paystackYearlyPlanCodeEnv: "PAYSTACK_PLAN_PRO_YEARLY",
         highlighted: true,
         aliases: ["business"],
         videoUploadLimitBytes: 10 * GIB,
@@ -158,10 +179,12 @@ const planDefinitions = [
         maxGalleries: null,
         maxTeamMembers: 10,
         priceGhs: 120,
+        yearlyPriceGhs: 1300,
         interval: "monthly",
         trialDays: null,
         paystackPlanCodeEnv: "PAYSTACK_PLAN_PREMIUM",
         paystackPlanCodeEnvFallbacks: ["PAYSTACK_PLAN_STUDIO"],
+        paystackYearlyPlanCodeEnv: "PAYSTACK_PLAN_PREMIUM_YEARLY",
         highlighted: false,
         aliases: ["studio"],
         videoUploadLimitBytes: 20 * GIB,
@@ -191,25 +214,83 @@ export const normalizePlanId = (planId) => {
     return PLAN_ALIASES[id] || id
 }
 
+export const normalizeBillingInterval = (interval) => {
+    const raw = String(interval ?? "").trim().toLowerCase()
+    if (raw === "yearly" || raw === "annual" || raw === "annually" || raw === "year") {
+        return BILLING_INTERVALS.yearly
+    }
+    if (raw === "monthly" || raw === "month") {
+        return BILLING_INTERVALS.monthly
+    }
+    return ""
+}
+
+export const paystackIntervalFor = (interval) =>
+    PAYSTACK_INTERVAL_BY_OURS[normalizeBillingInterval(interval)] || "monthly"
+
+export const addUtcDays = (date, days) => {
+    const value = date instanceof Date ? date : new Date(date)
+    if (Number.isNaN(value.getTime())) return null
+    return new Date(value.getTime() + Number(days) * DAY_MS)
+}
+
 export const defaultTrialEndsAt = (fromDate = new Date()) =>
-    new Date(new Date(fromDate).getTime() + FREE_TRIAL_DAYS * DAY_MS)
+    addUtcDays(fromDate, FREE_TRIAL_DAYS)
 
-const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active", "non_renewing"])
+const PAID_ACCESS_STATUSES = new Set([
+    "active",
+    "non_renewing",
+    "past_due",
+    "pending",
+])
 
-export const getUserPlanId = (user) => {
+/** True when the billed period has ended (no date = still in period). */
+export const hasPaidPeriodEnded = (currentPeriodEnd, now = new Date()) => {
+    if (!currentPeriodEnd) return false
+    const end = new Date(currentPeriodEnd)
+    if (Number.isNaN(end.getTime())) return false
+    return end.getTime() <= now.getTime()
+}
+
+/** Last moment paid features stay on: period end + grace days. */
+export const getPaidAccessEndsAt = (currentPeriodEnd) => {
+    if (!currentPeriodEnd) return null
+    return addUtcDays(currentPeriodEnd, SUBSCRIPTION_GRACE_DAYS)
+}
+
+export const hasPaidAccessEnded = (currentPeriodEnd, now = new Date()) => {
+    const ends = getPaidAccessEndsAt(currentPeriodEnd)
+    if (!ends) return false
+    return ends.getTime() <= now.getTime()
+}
+
+/**
+ * Paid features stay on until period end + 3-day grace — including after
+ * cancel (`non_renewing`), past_due, and while switching (`pending` with a sub).
+ * After grace with no renewal, access drops (view-only).
+ */
+export const hasPaidAccess = (user, now = new Date()) => {
     const sub = user?.subscription
-    if (!sub) return "free"
+    if (!sub) return false
 
     const planId = normalizePlanId(sub.planId)
-    if (
-        planId &&
-        planId !== "free" &&
-        ACTIVE_SUBSCRIPTION_STATUSES.has(sub.status)
-    ) {
-        return planId
+    if (!planId || planId === "free") return false
+    if (!PAID_ACCESS_STATUSES.has(sub.status)) return false
+
+    if (sub.status === "pending" && !sub.paystackSubscriptionCode?.trim()) {
+        return false
     }
 
-    return "free"
+    if (hasPaidAccessEnded(sub.currentPeriodEnd, now)) {
+        return false
+    }
+
+    return true
+}
+
+export const getUserPlanId = (user) => {
+    if (!hasPaidAccess(user)) return "free"
+    return normalizePlanId(user?.subscription?.planId) || "free"
 }
 
 /**
@@ -227,17 +308,73 @@ export const getTrialEndsAt = (user) => {
     return null
 }
 
-/** Free-plan trial still open (paid plans ignore trial). */
-export const isFreeTrialActive = (user) => {
+export const getTrialAccessEndsAt = (user) => {
+    const ends = getTrialEndsAt(user)
+    if (!ends) return null
+    return addUtcDays(ends, SUBSCRIPTION_GRACE_DAYS)
+}
+
+/** Free-plan trial still open (paid plans ignore trial). Does not include grace. */
+export const isFreeTrialActive = (user, now = new Date()) => {
     if (getUserPlanId(user) !== "free") return false
     const ends = getTrialEndsAt(user)
     if (!ends) return false
-    return ends.getTime() > Date.now()
+    return ends.getTime() > now.getTime()
 }
 
-export const isFreeTrialExpired = (user) => {
+/** Trial calendar ended, but the 3-day grace window is still open. */
+export const isFreeTrialInGrace = (user, now = new Date()) => {
     if (getUserPlanId(user) !== "free") return false
-    return !isFreeTrialActive(user)
+    if (isFreeTrialActive(user, now)) return false
+    const graceEnds = getTrialAccessEndsAt(user)
+    if (!graceEnds) return false
+    return graceEnds.getTime() > now.getTime()
+}
+
+/** Trial + grace have both ended — photographer is view-only until they subscribe. */
+export const isFreeTrialExpired = (user, now = new Date()) => {
+    if (getUserPlanId(user) !== "free") return false
+    return !isFreeTrialActive(user, now) && !isFreeTrialInGrace(user, now)
+}
+
+export const isPaidInGrace = (user, now = new Date()) => {
+    if (!hasPaidAccess(user, now)) return false
+    return hasPaidPeriodEnded(user?.subscription?.currentPeriodEnd, now)
+}
+
+/** Paid or trial period has ended, but the 3-day grace window is still open. */
+export const isInGracePeriod = (user, now = new Date()) =>
+    isPaidInGrace(user, now) || isFreeTrialInGrace(user, now)
+
+/**
+ * After grace with no renewal: photographer can view existing work only.
+ * Billing checkout / verify stay allowed so they can subscribe again.
+ */
+export const isViewOnlyLocked = (user, now = new Date()) =>
+    !hasPaidAccess(user, now) && isFreeTrialExpired(user, now)
+
+export const getAccessUntil = (user) => {
+    if (hasPaidAccess(user) || user?.subscription?.currentPeriodEnd) {
+        const paidEnds = getPaidAccessEndsAt(user?.subscription?.currentPeriodEnd)
+        if (paidEnds) return paidEnds
+    }
+    return getTrialAccessEndsAt(user)
+}
+
+export const getUserBillingInterval = (user) => {
+    const stored = normalizeBillingInterval(user?.subscription?.interval)
+    if (stored) return stored
+    const fromCode = getPlanByPaystackCode(user?.subscription?.paystackPlanCode)
+    if (fromCode?.interval) return fromCode.interval
+    return BILLING_INTERVALS.monthly
+}
+
+export const planPriceGhsForInterval = (plan, interval) => {
+    const resolved = normalizeBillingInterval(interval) || BILLING_INTERVALS.monthly
+    if (resolved === BILLING_INTERVALS.yearly) {
+        return Number(plan?.yearlyPriceGhs ?? plan?.priceGhs ?? 0)
+    }
+    return Number(plan?.priceGhs ?? 0)
 }
 
 const resolvePaystackPlanCode = (plan) => {
@@ -287,6 +424,10 @@ const mergePlan = (base, override = null) => {
         ...(override?.priceGhs != null && Number.isFinite(Number(override.priceGhs))
             ? { priceGhs: Number(override.priceGhs) }
             : {}),
+        ...(override?.yearlyPriceGhs != null &&
+        Number.isFinite(Number(override.yearlyPriceGhs))
+            ? { yearlyPriceGhs: Number(override.yearlyPriceGhs) }
+            : {}),
         ...(override?.videoUploadLimitBytes !== undefined
             ? {
                   videoUploadLimitBytes:
@@ -307,31 +448,63 @@ const mergePlan = (base, override = null) => {
     return {
         ...merged,
         paystackPlanCode: resolvePaystackPlanCode(merged),
+        yearlyPaystackPlanCode: resolvePaystackPlanCode({
+            ...merged,
+            paystackPlanCodeEnv: merged.paystackYearlyPlanCodeEnv,
+            paystackPlanCodeEnvFallbacks: [],
+        }),
     }
 }
 
-const shapePlan = (merged) => ({
-    id: merged.id,
-    name: merged.name,
-    storageLimitBytes: merged.storageLimitBytes,
-    maxGalleries: merged.maxGalleries ?? null,
-    maxTeamMembers: merged.maxTeamMembers ?? null,
-    videoUploadLimitBytes: merged.videoUploadLimitBytes ?? 0,
-    priceGhs: merged.priceGhs,
-    /** Alias for UI that expects a dollar-style amount (same number as priceGhs). */
-    price: merged.priceGhs,
-    interval: merged.interval,
-    trialDays: merged.trialDays ?? null,
-    description: merged.description,
-    perks: Array.isArray(merged.perks) ? merged.perks : [],
-    featureKeys: Array.isArray(merged.featureKeys) ? merged.featureKeys : [],
-    supportTier: merged.supportTier || "contact",
-    highlighted: merged.highlighted === true,
-    aliases: Array.isArray(merged.aliases) ? merged.aliases : [],
-    paystackPlanCode: merged.paystackPlanCode,
-    paystackPlanCodeEnv: merged.paystackPlanCodeEnv ?? null,
-    available: merged.id === "free" || Boolean(merged.paystackPlanCode),
-})
+const shapePlan = (merged) => {
+    const monthlyAvailable =
+        merged.id === "free" || Boolean(merged.paystackPlanCode)
+    const yearlyAvailable =
+        merged.id === "free" || Boolean(merged.yearlyPaystackPlanCode)
+
+    return {
+        id: merged.id,
+        name: merged.name,
+        storageLimitBytes: merged.storageLimitBytes,
+        maxGalleries: merged.maxGalleries ?? null,
+        maxTeamMembers: merged.maxTeamMembers ?? null,
+        videoUploadLimitBytes: merged.videoUploadLimitBytes ?? 0,
+        priceGhs: merged.priceGhs,
+        /** Alias for UI that expects a dollar-style amount (same number as priceGhs). */
+        price: merged.priceGhs,
+        yearlyPriceGhs: merged.yearlyPriceGhs ?? 0,
+        interval: merged.interval,
+        prices: {
+            monthly: {
+                interval: BILLING_INTERVALS.monthly,
+                priceGhs: merged.priceGhs,
+                price: merged.priceGhs,
+                paystackPlanCode: merged.paystackPlanCode ?? null,
+                available: monthlyAvailable,
+            },
+            yearly: {
+                interval: BILLING_INTERVALS.yearly,
+                priceGhs: merged.yearlyPriceGhs ?? 0,
+                price: merged.yearlyPriceGhs ?? 0,
+                paystackPlanCode: merged.yearlyPaystackPlanCode ?? null,
+                available: yearlyAvailable,
+            },
+        },
+        trialDays: merged.trialDays ?? null,
+        description: merged.description,
+        perks: Array.isArray(merged.perks) ? merged.perks : [],
+        featureKeys: Array.isArray(merged.featureKeys) ? merged.featureKeys : [],
+        supportTier: merged.supportTier || "contact",
+        highlighted: merged.highlighted === true,
+        aliases: Array.isArray(merged.aliases) ? merged.aliases : [],
+        paystackPlanCode: merged.paystackPlanCode,
+        paystackPlanCodeEnv: merged.paystackPlanCodeEnv ?? null,
+        yearlyPaystackPlanCode: merged.yearlyPaystackPlanCode ?? null,
+        paystackYearlyPlanCodeEnv: merged.paystackYearlyPlanCodeEnv ?? null,
+        available: monthlyAvailable || yearlyAvailable,
+        graceDays: SUBSCRIPTION_GRACE_DAYS,
+    }
+}
 
 export const setPlanCatalogOverrides = (overrides = {}) => {
     const next = Object.create(null)
@@ -358,6 +531,7 @@ export const loadPlanCatalogOverridesFromDb = async (PlanConfigModel) => {
             maxGalleries: row.maxGalleries,
             maxTeamMembers: row.maxTeamMembers,
             priceGhs: row.priceGhs,
+            yearlyPriceGhs: row.yearlyPriceGhs,
             videoUploadLimitBytes: row.videoUploadLimitBytes,
             perks: row.perks,
             featureKeys: Array.isArray(row.featureKeys)
@@ -390,10 +564,12 @@ export const getPlanByPaystackCode = (planCode) => {
     const code = String(planCode ?? "").trim()
     if (!code) return null
 
-    for (const plan of planDefinitions) {
-        const merged = mergePlan(plan, planOverridesById[plan.id])
-        if (merged.paystackPlanCode === code) {
-            return shapePlan(merged)
+    for (const plan of getAllPlans()) {
+        if (plan.paystackPlanCode === code) {
+            return getCheckoutPlan(plan.id, BILLING_INTERVALS.monthly)
+        }
+        if (plan.yearlyPaystackPlanCode === code) {
+            return getCheckoutPlan(plan.id, BILLING_INTERVALS.yearly)
         }
     }
 
@@ -403,8 +579,37 @@ export const getPlanByPaystackCode = (planCode) => {
 export const getPaidPlans = () =>
     getAllPlans().filter((plan) => plan.id !== "free")
 
+export const getCheckoutPlan = (planId, interval = BILLING_INTERVALS.monthly) => {
+    const plan = getPlanById(planId)
+    if (!plan) return null
+
+    const resolved =
+        normalizeBillingInterval(interval) || BILLING_INTERVALS.monthly
+    const yearly = resolved === BILLING_INTERVALS.yearly
+    const priceGhs = planPriceGhsForInterval(plan, resolved)
+    const paystackPlanCode = yearly
+        ? plan.yearlyPaystackPlanCode
+        : plan.paystackPlanCode
+    const paystackPlanCodeEnv = yearly
+        ? plan.paystackYearlyPlanCodeEnv
+        : plan.paystackPlanCodeEnv
+
+    return {
+        ...plan,
+        interval: resolved,
+        priceGhs,
+        price: priceGhs,
+        paystackPlanCode,
+        paystackPlanCodeEnv,
+        available: plan.id === "free" || Boolean(paystackPlanCode),
+    }
+}
+
 export const planAmountPesewas = (plan) =>
     Math.round(Number(plan?.priceGhs ?? 0) * 100)
+
+export const checkoutAmountPesewas = (planId, interval) =>
+    planAmountPesewas(getCheckoutPlan(planId, interval))
 
 /** Active temporary admin bump on a photographer account. */
 export const getActiveLimitOverride = (user) => {

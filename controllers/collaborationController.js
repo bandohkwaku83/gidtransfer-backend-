@@ -7,7 +7,9 @@ import Gallery from "../models/Gallery.js"
 import {
     assertWorkspaceAccess,
     countWorkspaceSeats,
+    countWorkspaceSeatsBulk,
     loadWorkspaceOwnerUser,
+    memberRolesForWorkspaces,
     ownerCanManageCollaboration,
     workspacesAccessibleByUser,
 } from "../utils/collaborationAccess.js"
@@ -22,18 +24,6 @@ import {
     parsePagination,
 } from "../utils/pagination.js"
 import { galleryOwnerFilter, galleryNotDeletedFilter } from "../utils/galleryFields.js"
-
-const roleForWorkspace = async (userId, workspace) => {
-    if (String(workspace.owner) === String(userId)) return "owner"
-    const member = await CollaborationMember.findOne({
-        workspace: workspace._id,
-        user: userId,
-        status: "active",
-    })
-        .select("role")
-        .lean()
-    return member?.role ?? "viewer"
-}
 
 export const listWorkspaces = async (req, res) => {
     try {
@@ -57,20 +47,25 @@ export const listWorkspaces = async (req, res) => {
             ).exec(),
         ])
 
-        const seatCounts = await Promise.all(
-            rows.map((w) => countWorkspaceSeats(w._id))
-        )
-        const roles = await Promise.all(
-            rows.map((w) => roleForWorkspace(req.user._id, w))
-        )
+        const workspaceIds = rows.map((w) => w._id)
+        const userIdStr = String(req.user._id)
+        const [seatMap, roleMap] = await Promise.all([
+            countWorkspaceSeatsBulk(workspaceIds),
+            memberRolesForWorkspaces(req.user._id, workspaceIds),
+        ])
 
         return res.status(200).json({
-            workspaces: rows.map((w, i) =>
-                formatWorkspaceResponse(w, {
-                    role: roles[i],
-                    memberCount: seatCounts[i],
+            workspaces: rows.map((w) => {
+                const wid = String(w._id)
+                const role =
+                    String(w.owner?._id ?? w.owner) === userIdStr
+                        ? "owner"
+                        : roleMap.get(wid) ?? "viewer"
+                return formatWorkspaceResponse(w, {
+                    role,
+                    memberCount: seatMap.get(wid) ?? 0,
                 })
-            ),
+            }),
             pagination: buildPaginationMeta({
                 page: pagination.page,
                 limit: pagination.limit,

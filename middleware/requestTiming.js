@@ -1,4 +1,7 @@
-const SLOW_REQUEST_MS = Number(process.env.SLOW_REQUEST_MS ?? 200)
+const SLOW_REQUEST_MS = Number(process.env.SLOW_REQUEST_MS ?? 800)
+const TIMING_HEADER_ENABLED =
+    process.env.REQUEST_TIMING_HEADER !== "0" &&
+    process.env.REQUEST_TIMING_HEADER !== "false"
 
 const routeLabel = (req) => {
     if (req.route?.path) {
@@ -15,11 +18,15 @@ export const requestTiming = (req, res, next) => {
     res.end = function requestTimingEnd(...args) {
         const elapsedMs = Number(process.hrtime.bigint() - start) / 1_000_000
 
-        if (!res.headersSent && process.env.REQUEST_TIMING_HEADER !== "0") {
-            res.setHeader("Server-Timing", `total;dur=${elapsedMs.toFixed(1)}`)
+        if (TIMING_HEADER_ENABLED && !res.headersSent) {
+            try {
+                res.setHeader("Server-Timing", `total;dur=${elapsedMs.toFixed(1)}`)
+            } catch {
+                // Header already flushed — ignore.
+            }
         }
 
-        if (elapsedMs >= SLOW_REQUEST_MS) {
+        if (SLOW_REQUEST_MS > 0 && elapsedMs >= SLOW_REQUEST_MS) {
             console.warn(
                 `[perf] slow ${routeLabel(req)} ${res.statusCode} ${elapsedMs.toFixed(1)}ms`
             )
