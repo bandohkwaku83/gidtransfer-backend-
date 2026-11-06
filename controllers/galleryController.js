@@ -697,6 +697,7 @@ export const createShareLink = async (req, res) => {
                         ownerStudio: owner?.studio ?? req.user.studio,
                         companySlug,
                         customMessage: req.body?.message,
+                        shareUrl: req.body?.shareUrl,
                     })
                 } catch (error) {
                     const mapped = mapGallerySmsError(error)

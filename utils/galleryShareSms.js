@@ -5,11 +5,54 @@ import {
 } from "./studioSms.js"
 import { buildGalleryClientUrl } from "./galleryShareUrl.js"
 
+const httpUrl = (value) => {
+    const raw = typeof value === "string" ? value.trim() : ""
+    if (!raw) return null
+    try {
+        const url = new URL(raw)
+        if (url.protocol !== "http:" && url.protocol !== "https:") return null
+        return url
+    } catch {
+        return null
+    }
+}
+
+/** Accept a caller URL only when it is this gallery's client link. */
+export const shareUrlForGallery = (gallery, requestedShareUrl) => {
+    const slug = gallery?.slug?.trim()
+    const url = httpUrl(requestedShareUrl)
+    if (!slug || !url) return null
+
+    const path = url.pathname.replace(/\/+$/, "") || "/"
+    if (path !== `/client/${slug}`) return null
+    return url.toString()
+}
+
+export const resolveGalleryNotifyShareUrl = ({
+    gallery,
+    companySlug,
+    requestedShareUrl,
+}) =>
+    buildGalleryClientUrl(companySlug, gallery?.slug) ||
+    shareUrlForGallery(gallery, requestedShareUrl) ||
+    null
+
+/** Keep the client link in the SMS even when a custom message omits it. */
+export const messageWithGalleryLink = (message, shareUrl) => {
+    const text = String(message ?? "").trim()
+    const link = String(shareUrl ?? "").trim()
+    if (!link) return text
+    if (text.includes(link)) return text
+    if (!text) return link
+    return `${text}\n${link}`
+}
+
 export const notifyClientGalleryShareSms = async ({
     gallery,
     ownerStudio,
     companySlug,
     customMessage,
+    shareUrl: requestedShareUrl,
 }) => {
     const client = gallery.client
     const phone = client?.phone
@@ -19,23 +62,26 @@ export const notifyClientGalleryShareSms = async ({
         })
     }
 
-    const shareUrl =
-        buildGalleryClientUrl(companySlug, gallery.slug) ||
-        gallery.shareUrl ||
-        null
+    const shareUrl = resolveGalleryNotifyShareUrl({
+        gallery,
+        companySlug,
+        requestedShareUrl,
+    })
     if (!shareUrl) {
         throw new ArkeselSmsError("Gallery share URL is not available", {
             code: "MISSING_SHARE_URL",
         })
     }
 
-    const message =
+    const message = messageWithGalleryLink(
         customMessage?.trim() ||
-        buildGalleryShareSmsMessage({
-            studioName: ownerStudio?.companyName,
-            galleryName: gallery.name,
-            shareUrl,
-        })
+            buildGalleryShareSmsMessage({
+                studioName: ownerStudio?.companyName,
+                galleryName: gallery.name,
+                shareUrl,
+            }),
+        shareUrl,
+    )
 
     return sendStudioSms({
         studio: ownerStudio,

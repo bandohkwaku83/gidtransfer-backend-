@@ -199,6 +199,7 @@ fs.mkdirSync(path.join(uploadsDir, "studio-logos"), { recursive: true })
 fs.mkdirSync(path.join(uploadsDir, "brand"), { recursive: true })
 fs.mkdirSync(path.join(uploadsDir, "user-avatars"), { recursive: true })
 fs.mkdirSync(path.join(uploadsDir, "watermark-logos"), { recursive: true })
+fs.mkdirSync(path.join(uploadsDir, "gallery-trademarks"), { recursive: true })
 fs.mkdirSync(path.join(uploadsDir, "gallery-default-covers"), { recursive: true })
 fs.mkdirSync(path.join(uploadsDir, "issue-reports"), { recursive: true })
 fs.mkdirSync(path.join(uploadsDir, "gallery-covers"), { recursive: true })
@@ -463,6 +464,11 @@ app.get("/api", (_req, res) => {
                     "PATCH /api/galleries/:id/upload-settings (watermarkPreviewEnabled)",
                 finalSettings:
                     "PATCH /api/galleries/:id/final-settings (watermarkFinalsEnabled)",
+                trademark: {
+                    get: "GET /api/galleries/:id/trademark",
+                    update:
+                        "PUT /api/galleries/:id/trademark (JSON or multipart: posX, posY, sizePercent; optional logo file, logoDataUrl, clearLogo). One placement for portrait and landscape.",
+                },
                 uploads: {
                     list: "GET /api/galleries/:id/uploads?mediaType=photo|video&q=&scene=&tag=&suggested=&blurry=&eyesOpen=&minQuality=&page=&limit= (search uses OpenSearch when enabled)",
                     reorder:
@@ -486,6 +492,8 @@ app.get("/api", (_req, res) => {
                     upload:
                         "POST /api/galleries/:id/uploads (legacy mixed multipart field photos — local dev only when S3 is not configured)",
                     bulkDelete: "POST /api/galleries/:id/uploads/bulk-delete",
+                    moveSet:
+                        "PATCH /api/galleries/:id/uploads/set (body: photoIds[], setId or null)",
                     delete: "DELETE /api/galleries/:id/uploads/:photoId",
                     restore: "POST /api/galleries/:id/uploads/:photoId/restore",
                 },
@@ -501,6 +509,10 @@ app.get("/api", (_req, res) => {
                         "POST /api/galleries/:id/finals/complete (JSON: files[] with storedFilename from presign)",
                     upload: "POST /api/galleries/:id/finals (multipart — local dev only when S3 is not configured)",
                     lock: "PATCH /api/galleries/:id/finals/:finalId/lock",
+                    lockMany:
+                        "PATCH /api/galleries/:id/finals/lock (body: finalIds[] or all: true, isLocked, amountOwing)",
+                    moveSet:
+                        "PATCH /api/galleries/:id/finals/set (body: finalIds[], setId or null)",
                     bulkDelete: "POST /api/galleries/:id/finals/bulk-delete",
                     delete: "DELETE /api/galleries/:id/finals/:finalId",
                     restore: "POST /api/galleries/:id/finals/:finalId/restore",

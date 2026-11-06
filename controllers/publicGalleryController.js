@@ -9,6 +9,7 @@ import {
     formatPublicGalleryPhotoResponse,
 } from "../utils/galleryDetailHelpers.js"
 import { formatGallerySetsSettingsResponse } from "../utils/galleryFields.js"
+import { formatFinalTrademark } from "../utils/finalTrademarkFields.js"
 import { resolveMediaUrl, formatPublicStudioResponse } from "../utils/formatUserResponse.js"
 import { GALLERY_FINALS_DIR } from "../utils/galleryFinalStorage.js"
 import {
@@ -169,6 +170,7 @@ function formatPublicGalleryMeta(gallery, { selectedCount = 0, commentsEnabled =
         requireEmailToView: gallery.emailGateEnabled === true,
         require_email_to_view: gallery.emailGateEnabled === true,
         watermarkPreviewEnabled: gallery.watermarkPreviewEnabled === true,
+        finalTrademark: formatFinalTrademark(gallery),
         backgroundMusicUrl:
             gallery.backgroundMusicEnabled && gallery.backgroundMusicUrl
                 ? resolveMediaUrl(gallery.backgroundMusicUrl)

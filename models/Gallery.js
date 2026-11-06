@@ -326,6 +326,16 @@ const gallerySchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
+        /**
+         * Logo drawn on this gallery's finals. One placement for portrait and landscape:
+         * posX/posY are the logo center, 0–1 across the photo.
+         */
+        finalTrademark: {
+            logoUrl: { type: String, default: "", trim: true },
+            posX: { type: Number, default: 0.88, min: 0, max: 1 },
+            posY: { type: Number, default: 0.88, min: 0, max: 1 },
+            sizePercent: { type: Number, default: 16, min: 8, max: 36 },
+        },
         /** Client gallery "All" pill label (virtual set spanning every upload). */
         setsAllLabel: {
             type: String,

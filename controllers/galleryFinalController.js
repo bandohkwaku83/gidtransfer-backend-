@@ -439,6 +439,57 @@ export const updateGalleryFinalLock = async (req, res) => {
     }
 }
 
+/** Lock or unlock every final in `finalIds`, or the whole gallery when `all` is true. */
+export const updateGalleryFinalsLock = async (req, res) => {
+    try {
+        const { id } = req.params
+        const gallery = await loadOwnedGallery(id, req.user._id)
+        if (!gallery) {
+            return res.status(404).json({ message: "Gallery not found" })
+        }
+
+        const all = req.body?.all === true || req.body?.all === "true"
+        const ids = Array.isArray(req.body?.finalIds)
+            ? [...new Set(req.body.finalIds.filter((x) => mongoose.isValidObjectId(x)))]
+            : []
+
+        if (!all && !ids.length) {
+            return res.status(400).json({
+                message: "Provide finalIds array or all: true",
+            })
+        }
+
+        const update = resolveGalleryFinalLockUpdate(req.body, {})
+        if (update.error) {
+            return res.status(400).json({ message: update.error })
+        }
+
+        const filter = { gallery: gallery._id, deletedAt: null }
+        if (!all) filter._id = { $in: ids }
+
+        const matched = await GalleryFinal.countDocuments(filter)
+        if (!matched) {
+            return res.status(404).json({ message: "Final not found" })
+        }
+
+        await GalleryFinal.updateMany(filter, {
+            $set: {
+                isLocked: update.isLocked,
+                outstandingBalanceGhs: update.outstandingBalanceGhs,
+                clientPaid: update.clientPaid,
+            },
+        })
+
+        return res.status(200).json({
+            message: update.isLocked ? "Finals locked" : "Finals unlocked",
+            count: matched,
+        })
+    } catch (error) {
+        console.error("updateGalleryFinalsLock:", error)
+        return res.status(500).json({ message: "Server error" })
+    }
+}
+
 export const deleteGalleryFinal = async (req, res) => {
     try {
         const { id, finalId } = req.params

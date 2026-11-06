@@ -38,6 +38,8 @@ import {
     createGallerySet,
     deleteGallerySet,
     listGallerySets,
+    moveGalleryFinalsToSet,
+    moveGalleryPhotosToSet,
     updateGallerySet,
     updateGallerySetsSettings,
 } from "../controllers/gallerySetController.js"
@@ -61,6 +63,7 @@ import {
     reorderGalleryFinals,
     restoreGalleryFinal,
     updateGalleryFinalLock,
+    updateGalleryFinalsLock,
     uploadGalleryFinals,
 } from "../controllers/galleryFinalController.js"
 import { multipartGalleryCoverOptional } from "../middleware/multipartGalleryCoverOptional.js"
@@ -68,6 +71,11 @@ import { handleGalleryMediaUpload, handleGalleryPhotosUpload } from "../middlewa
 import { handleGalleryVideosUpload } from "../middleware/uploadGalleryVideos.js"
 import { handleGalleryMusicUpload } from "../middleware/uploadGalleryMusic.js"
 import { handleGalleryFinalsUpload } from "../middleware/uploadGalleryFinals.js"
+import {
+    getGalleryTrademark,
+    updateGalleryTrademark,
+} from "../controllers/galleryTrademarkController.js"
+import { handleUploadGalleryTrademark } from "../middleware/uploadGalleryTrademark.js"
 import { protectUser } from "../middleware/userAuth.js"
 import { requirePlanFeature } from "../middleware/requirePlanFeature.js"
 import { requireMenu } from "../middleware/requireMenu.js"
@@ -94,6 +102,12 @@ router.patch("/:id/client-access", updateGalleryClientAccess)
 router.get("/:id/access-emails", listGalleryAccessEmails)
 router.patch("/:id/upload-settings", updateGalleryUploadSettings)
 router.patch("/:id/final-settings", updateGalleryFinalSettings)
+router.get("/:id/trademark", getGalleryTrademark)
+router.put(
+    "/:id/trademark",
+    handleUploadGalleryTrademark,
+    updateGalleryTrademark
+)
 
 router.get("/:id/sets", listGallerySets)
 router.patch(
@@ -146,6 +160,11 @@ router.post("/:id/uploads/complete", completeGalleryPhotoUploads)
 router.patch("/:id/uploads/reorder", reorderGalleryUploads)
 router.post("/:id/uploads", handleGalleryMediaUpload, uploadGalleryPhotos)
 router.post("/:id/uploads/bulk-delete", bulkDeleteGalleryPhotos)
+router.patch(
+    "/:id/uploads/set",
+    requirePlanFeature("gallerySets"),
+    moveGalleryPhotosToSet
+)
 router.delete("/:id/uploads/:photoId", deleteGalleryPhoto)
 router.post("/:id/uploads/:photoId/restore", restoreGalleryPhoto)
 
@@ -159,6 +178,12 @@ router.post("/:id/finals/complete", completeGalleryFinalUploads)
 router.patch("/:id/finals/reorder", reorderGalleryFinals)
 router.post("/:id/finals", handleGalleryFinalsUpload, uploadGalleryFinals)
 router.post("/:id/finals/bulk-delete", bulkDeleteGalleryFinals)
+router.patch(
+    "/:id/finals/set",
+    requirePlanFeature("gallerySets"),
+    moveGalleryFinalsToSet
+)
+router.patch("/:id/finals/lock", updateGalleryFinalsLock)
 router.patch("/:id/finals/:finalId/lock", updateGalleryFinalLock)
 router.patch("/:id/finals/:finalId/reply", patchGalleryFinalReply)
 router.delete("/:id/finals/:finalId", deleteGalleryFinal)

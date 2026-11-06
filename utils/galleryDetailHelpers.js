@@ -28,6 +28,7 @@ import {
     backfillGallerySlug,
     ensureUserCompanySlug,
 } from "./gallerySlugHelpers.js"
+import { formatFinalTrademark } from "./finalTrademarkFields.js"
 
 export const ownedGalleryFilter = (id, userId) => ({
     _id: id,
@@ -94,6 +95,7 @@ const formatGalleryDetailFields = (galleryDoc) => {
         finalDeliveryEnabled: plain.finalDeliveryEnabled !== false,
         watermarkPreviewEnabled: plain.watermarkPreviewEnabled === true,
         watermarkFinalsEnabled: plain.watermarkFinalsEnabled === true,
+        finalTrademark: formatFinalTrademark(plain),
         ...formatGallerySetsSettingsResponse(plain),
     }
 }
